@@ -30,9 +30,6 @@ fn init(our: Address) {
         crdt
     };
 
-    let contact_book: ContactBook = hydrate(&crdt).unwrap();
-    println!("state: {:?}", contact_book);
-
     let mut failed_messages: Vec<(Address, Message)> = vec![];
 
     let mut ws_channels: HashSet<u32> = HashSet::new();
@@ -46,19 +43,7 @@ fn init(our: Address) {
 
     loop {
         match handle_message(&our, &mut crdt, &mut failed_messages, &mut ws_channels) {
-            Ok(()) => {
-                // serve a WS update to frontend with our whole state
-                for channel_id in ws_channels.iter() {
-                    http::send_ws_push(
-                        *channel_id,
-                        http::WsMessageType::Text,
-                        kinode_process_lib::LazyLoadBlob {
-                            mime: Some("application/json".to_string()),
-                            bytes: serde_json::to_vec(&contact_book).unwrap(),
-                        },
-                    );
-                }
-            }
+            Ok(()) => {}
             Err(e) => {
                 println!("error: {:?}", e);
             }
@@ -96,13 +81,19 @@ fn handle_message(
                     if !message.is_request() {
                         return Ok(());
                     }
-                    handle_local_message(our, serde_json::from_slice(message.body())?, crdt)
+                    handle_local_message(
+                        our,
+                        serde_json::from_slice(message.body())?,
+                        crdt,
+                        ws_channels,
+                    )
+                    .or(respond(ContactResponse::Err(ContactError::BadUpdate)))
                 }
             } else {
                 if !message.is_request() {
                     return Ok(());
                 }
-                handle_remote_message(message, crdt)
+                handle_remote_message(message, crdt, ws_channels)
                     .or(respond(ContactResponse::Err(ContactError::BadUpdate)))
             }
         }
@@ -123,6 +114,7 @@ fn handle_local_message(
     our: &Address,
     update: Update,
     crdt: &mut AutoCommit,
+    ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<()> {
     let mut contact_book: ContactBook = hydrate(crdt)?;
 
@@ -150,12 +142,28 @@ fn handle_local_message(
         }
     }
 
+    for channel_id in ws_channels.iter() {
+        println!("sending ws update");
+        http::send_ws_push(
+            *channel_id,
+            http::WsMessageType::Text,
+            kinode_process_lib::LazyLoadBlob {
+                mime: Some("application/json".to_string()),
+                bytes: serde_json::to_vec(&contact_book).unwrap(),
+            },
+        );
+    }
+
     println!("state: {:?}", contact_book);
     kinode_process_lib::set_state(&crdt.save_nocompress());
     Ok(())
 }
 
-fn handle_remote_message(message: Message, crdt: &mut AutoCommit) -> anyhow::Result<()> {
+fn handle_remote_message(
+    message: Message,
+    crdt: &mut AutoCommit,
+    ws_channels: &mut HashSet<u32>,
+) -> anyhow::Result<()> {
     let mut contact_book: ContactBook = hydrate(crdt)?;
 
     let Some(status) = contact_book.peers.get(&message.source()) else {
@@ -175,6 +183,18 @@ fn handle_remote_message(message: Message, crdt: &mut AutoCommit) -> anyhow::Res
             reconcile(crdt, &full_book_sync)?;
         }
     };
+
+    for channel_id in ws_channels.iter() {
+        println!("sending ws update");
+        http::send_ws_push(
+            *channel_id,
+            http::WsMessageType::Text,
+            kinode_process_lib::LazyLoadBlob {
+                mime: Some("application/json".to_string()),
+                bytes: serde_json::to_vec(&contact_book).unwrap(),
+            },
+        );
+    }
 
     println!("state: {:?}", contact_book);
     kinode_process_lib::set_state(&crdt.save_nocompress());
@@ -204,7 +224,7 @@ fn handle_http_request(
 
     match req {
         http::HttpServerRequest::Http(req) => {
-            match serve_http_paths(our, req, &mut contact_book, crdt) {
+            match serve_http_paths(our, req, &mut contact_book, crdt, ws_channels) {
                 Ok((status_code, body)) => http::send_response(
                     status_code,
                     Some(std::collections::HashMap::from([(
@@ -239,6 +259,7 @@ fn serve_http_paths(
     req: http::IncomingHttpRequest,
     contact_book: &mut ContactBook,
     crdt: &mut AutoCommit,
+    ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<(http::StatusCode, Vec<u8>)> {
     let method = req.method()?;
     // strips first section of path, which is the process name
@@ -261,7 +282,7 @@ fn serve_http_paths(
                     .ok_or(anyhow::anyhow!("http POST without body"))?
                     .bytes,
             )?;
-            handle_local_message(&our, update, crdt)?;
+            handle_local_message(&our, update, crdt, ws_channels)?;
             Ok((http::StatusCode::OK, vec![]))
         }
         _ => Ok((http::StatusCode::NOT_FOUND, vec![])),

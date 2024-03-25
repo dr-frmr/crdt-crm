@@ -45,6 +45,7 @@
             url = url.replace(/^https/, 'wss');
             const ws = new WebSocket(url);
             ws.onmessage = event => {
+                console.log(event.data);
                 const data = JSON.parse(event.data);
                 document.getElementById("contacts").innerHTML = JSON.stringify(data.contacts);
                 document.getElementById("peers").innerHTML = JSON.stringify(data.peers);

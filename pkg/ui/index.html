@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>KinoContacts</title>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <main>
+        <form action="/contacts:crdt-crm:mothu.eth/post" method="post">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+            <button type="submit">Add</button>
+        </form>
+        <h1>Contacts</h1>
+
+        <div id="contacts"></div>
+
+        <h1>Peers</h1>
+
+        <div id="peers"></div>
+
+        <script>
+            // HTTP GET request for /state path
+            // then display the result in the page
+            fetch('/contacts:crdt-crm:mothu.eth/state')
+                .then(response => response.json())
+                .then(data => {
+                    // display the data as a string
+                    document.getElementById("contacts").innerHTML = JSON.stringify(data.contacts);
+                    document.getElementById("peers").innerHTML = JSON.stringify(data.peers);
+                });
+            // connect to /updates websocket and listen for updates
+            // when we receive an update, display it in the page
+            var url = document.URL + 'updates';
+            // strip the protocol from the URL and replace it with ws
+            url = url.replace(/^http/, 'ws');
+            url = url.replace(/^https/, 'wss');
+            const ws = new WebSocket(url);
+            ws.onmessage = event => {
+                const data = JSON.parse(event.data);
+                document.getElementById("contacts").innerHTML = JSON.stringify(data.contacts);
+                document.getElementById("peers").innerHTML = JSON.stringify(data.peers);
+            };
+        </script>
+    </main>
+</body>
+
+</html>

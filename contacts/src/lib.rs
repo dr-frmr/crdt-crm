@@ -1,9 +1,11 @@
 #![feature(let_chains)]
+use crate::types::*;
 use automerge::AutoCommit;
-use autosurgeon::{hydrate, reconcile, Hydrate, Reconcile};
-use kinode_process_lib::{await_message, call_init, println, Address, Message, Request, Response};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use autosurgeon::{hydrate, reconcile};
+use kinode_process_lib::{await_message, http, println, Address, Message, Request, Response};
+use std::collections::HashSet;
+
+mod types;
 
 wit_bindgen::generate!({
     path: "wit",
@@ -13,98 +15,7 @@ wit_bindgen::generate!({
     },
 });
 
-#[derive(Debug, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
-struct ContactBook {
-    /// The contacts in the address book.
-    contacts: HashMap<String, Contact>,
-    /// The peers that have a copy of the address book and can make changes.
-    #[autosurgeon(with = "autosurgeon::map_with_parseable_keys")]
-    peers: HashMap<Address, PeerStatus>,
-}
-
-impl ContactBook {
-    fn default(our: &Address) -> Self {
-        Self {
-            contacts: HashMap::new(),
-            peers: HashMap::from([(our.clone(), PeerStatus::ReadWrite)]),
-        }
-    }
-
-    fn apply_update(&mut self, update: Update) -> anyhow::Result<()> {
-        match update {
-            Update::AddContact(id, contact) => {
-                self.contacts.insert(id, contact);
-            }
-            Update::RemoveContact(id) => {
-                self.contacts
-                    .remove(&id)
-                    .ok_or(anyhow::anyhow!("contact not found"))?;
-            }
-            Update::EditContactDescription(id, description) => {
-                self.contacts
-                    .get_mut(&id)
-                    .map(|c| c.description = description)
-                    .ok_or(anyhow::anyhow!("contact not found"))?;
-            }
-            Update::EditContactSocial(id, key, value) => {
-                self.contacts
-                    .get_mut(&id)
-                    .map(|c| c.socials.insert(key, value))
-                    .ok_or(anyhow::anyhow!("contact not found"))?;
-            }
-            Update::RemoveContactSocial(id, key) => {
-                self.contacts
-                    .get_mut(&id)
-                    .map(|c| c.socials.remove(&key))
-                    .ok_or(anyhow::anyhow!("contact not found"))?;
-            }
-            Update::AddPeer(address, status) => {
-                self.peers.insert(address, status);
-            }
-            Update::RemovePeer(address) => {
-                self.peers
-                    .remove(&address)
-                    .ok_or(anyhow::anyhow!("peer not found"))?;
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize, PartialEq)]
-enum PeerStatus {
-    #[default]
-    ReadOnly,
-    ReadWrite,
-}
-
-#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
-struct Contact {
-    description: String,
-    socials: HashMap<String, String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-enum Update {
-    AddContact(String, Contact),
-    RemoveContact(String),
-    EditContactDescription(String, String),
-    EditContactSocial(String, String, String),
-    RemoveContactSocial(String, String),
-    AddPeer(Address, PeerStatus),
-    RemovePeer(Address),
-}
-
-type ContactResponse = Result<(), ContactError>;
-
-#[derive(Serialize, Deserialize)]
-enum ContactError {
-    UnknownPeer,
-    ReadOnlyPeer,
-    BadUpdate,
-}
-
-call_init!(init);
+kinode_process_lib::call_init!(init);
 fn init(our: Address) {
     println!("start");
 
@@ -124,11 +35,30 @@ fn init(our: Address) {
 
     let mut failed_messages: Vec<(Address, Message)> = vec![];
 
+    let mut ws_channels: HashSet<u32> = HashSet::new();
+
+    http::serve_ui(&our, "ui", true, false, vec!["/"]).expect("couldn't serve UI");
+    http::bind_http_path("/state", true, false).expect("couldn't bind HTTP state path");
+    http::bind_http_path("/post", true, false).expect("couldn't bind HTTP post path");
+    http::bind_ws_path("/updates", true, false).expect("couldn't bind WS updates path");
+
     kinode_process_lib::timer::set_timer(10_000, None);
 
     loop {
-        match handle_message(&our, &mut crdt, &mut failed_messages) {
-            Ok(()) => {}
+        match handle_message(&our, &mut crdt, &mut failed_messages, &mut ws_channels) {
+            Ok(()) => {
+                // serve a WS update to frontend with our whole state
+                for channel_id in ws_channels.iter() {
+                    http::send_ws_push(
+                        *channel_id,
+                        http::WsMessageType::Text,
+                        kinode_process_lib::LazyLoadBlob {
+                            mime: Some("application/json".to_string()),
+                            bytes: serde_json::to_vec(&contact_book).unwrap(),
+                        },
+                    );
+                }
+            }
             Err(e) => {
                 println!("error: {:?}", e);
             }
@@ -140,6 +70,7 @@ fn handle_message(
     our: &Address,
     crdt: &mut AutoCommit,
     failed_messages: &mut Vec<(Address, Message)>,
+    ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<()> {
     match await_message() {
         Ok(message) => {
@@ -158,11 +89,14 @@ fn handle_message(
                             .send()?;
                     }
                     Ok(())
+                } else if message.source().process == "http_server:distro:sys" {
+                    // handle http requests
+                    handle_http_request(our, message, crdt, ws_channels)
                 } else {
                     if !message.is_request() {
                         return Ok(());
                     }
-                    handle_local_message(our, message, crdt)
+                    handle_local_message(our, serde_json::from_slice(message.body())?, crdt)
                 }
             } else {
                 if !message.is_request() {
@@ -187,15 +121,13 @@ fn handle_message(
 
 fn handle_local_message(
     our: &Address,
-    message: Message,
+    update: Update,
     crdt: &mut AutoCommit,
 ) -> anyhow::Result<()> {
-    let book_update: Update = serde_json::from_slice(message.body())?;
-
     let mut contact_book: ContactBook = hydrate(crdt)?;
 
     // if update was to add a peer, send them the full state
-    if let Update::AddPeer(peer, _status) = &book_update {
+    if let Update::AddPeer(peer, _status) = &update {
         Request::to(peer)
             .body(serde_json::to_vec(&contact_book)?)
             .context(peer.to_string())
@@ -203,14 +135,15 @@ fn handle_local_message(
             .send()?;
     }
 
-    contact_book.apply_update(book_update)?;
+    let serialized_update = serde_json::to_vec(&update)?;
+    contact_book.apply_update(update)?;
     reconcile(crdt, &contact_book).unwrap();
 
     // send update to all peers
     for (peer, _status) in &contact_book.peers {
         if peer != our {
             Request::to(peer)
-                .body(message.body().to_vec())
+                .body(serialized_update.clone())
                 .context(peer.to_string())
                 .expects_response(30)
                 .send()?;
@@ -252,4 +185,85 @@ fn respond(response: ContactResponse) -> anyhow::Result<()> {
     Response::new()
         .body(serde_json::to_vec(&response).unwrap())
         .send()
+}
+
+fn handle_http_request(
+    our: &Address,
+    message: Message,
+    crdt: &mut AutoCommit,
+    ws_channels: &mut HashSet<u32>,
+) -> anyhow::Result<()> {
+    if !message.is_request() {
+        return Ok(());
+    }
+    let Ok(req) = serde_json::from_slice::<http::HttpServerRequest>(message.body()) else {
+        return Err(anyhow::anyhow!("failed to parse incoming http request"));
+    };
+
+    let mut contact_book: ContactBook = hydrate(crdt)?;
+
+    match req {
+        http::HttpServerRequest::Http(req) => {
+            match serve_http_paths(our, req, &mut contact_book, crdt) {
+                Ok((status_code, body)) => http::send_response(
+                    status_code,
+                    Some(std::collections::HashMap::from([(
+                        String::from("Content-Type"),
+                        String::from("application/json"),
+                    )])),
+                    body,
+                ),
+                Err(e) => {
+                    http::send_response(http::StatusCode::INTERNAL_SERVER_ERROR, None, vec![]);
+                    return Err(e);
+                }
+            }
+        }
+        http::HttpServerRequest::WebSocketOpen { channel_id, .. } => {
+            // save channel id for pushing
+            ws_channels.insert(channel_id);
+        }
+        http::HttpServerRequest::WebSocketClose(channel_id) => {
+            // remove channel id
+            ws_channels.remove(&channel_id);
+        }
+        http::HttpServerRequest::WebSocketPush { .. } => {
+            // ignore for now
+        }
+    }
+    Ok(())
+}
+
+fn serve_http_paths(
+    our: &Address,
+    req: http::IncomingHttpRequest,
+    contact_book: &mut ContactBook,
+    crdt: &mut AutoCommit,
+) -> anyhow::Result<(http::StatusCode, Vec<u8>)> {
+    let method = req.method()?;
+    // strips first section of path, which is the process name
+    let bound_path = req.path()?;
+    let _url_params = req.url_params();
+
+    match bound_path.as_str() {
+        "/state" => {
+            if method != http::Method::GET {
+                return Ok((http::StatusCode::METHOD_NOT_ALLOWED, vec![]));
+            }
+            Ok((http::StatusCode::OK, serde_json::to_vec(&contact_book)?))
+        }
+        "/post" => {
+            if method != http::Method::POST {
+                return Ok((http::StatusCode::METHOD_NOT_ALLOWED, vec![]));
+            }
+            let update: Update = serde_json::from_slice(
+                &kinode_process_lib::get_blob()
+                    .ok_or(anyhow::anyhow!("http POST without body"))?
+                    .bytes,
+            )?;
+            handle_local_message(&our, update, crdt)?;
+            Ok((http::StatusCode::OK, vec![]))
+        }
+        _ => Ok((http::StatusCode::NOT_FOUND, vec![])),
+    }
 }

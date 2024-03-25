@@ -1,3 +1,4 @@
 target
 wit
 *.wasm
+.DS_Store

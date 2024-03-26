@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>KinoContacts</title>
-    <link rel="stylesheet" href="./style.css">
-    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/contacts:crdt-crm:mothu.eth/style.css">
+    <link rel="icon" href="/contacts:crdt-crm:mothu.eth/favicon.ico" type="image/x-icon">
 </head>
 
 <body>
@@ -15,10 +15,6 @@
         <h1>Contacts</h1>
 
         <div id="contacts"></div>
-
-        <h1>Peers</h1>
-
-        <div id="peers"></div>
 
         <h1>Add Contact</h1>
 
@@ -35,7 +31,32 @@
             <button type="submit">Add</button>
         </form>
 
+        <h1>Peers</h1>
+
+        <div id="peers"></div>
+
+        <form id="addPeerForm">
+            <label for="peerAddress">Peer:</label>
+            <input type="text" id="peer" name="peer" required>
+            <br>
+            <button type="submit">Add</button>
+        </form>
+
+        <br>
+        <br>
+        <form id="clearStateForm">
+            <button type="submit">Clear State</button>
+        </form>
+
         <script>
+            // set `our` to the string stored at /our path
+            let our = '';
+            fetch('/our')
+                .then(response => response.text())
+                .then(data => {
+                    our = data + '@contacts:crdt-crm:mothu.eth';
+                });
+
             document.getElementById('addCustomFieldBtn').addEventListener('click', function () {
                 const container = document.getElementById('customFieldsContainer');
                 const inputGroup = document.createElement('div');
@@ -61,7 +82,12 @@
 
             // connect to /updates websocket and listen for updates
             // when we receive an update, display it in the page
-            var url = document.URL + 'updates';
+            // if URL ends with a slash, strip it
+            let url = window.location.href;
+            if (url.endsWith('/')) {
+                url = url.slice(0, -1);
+            }
+            url = url + '/updates';
             // strip the protocol from the URL and replace it with ws
             url = url.replace(/^http/, 'ws');
             url = url.replace(/^https/, 'wss');
@@ -109,7 +135,7 @@
 
             // HTTP POST request to /post path
             // based on the form data
-            document.querySelector('form').addEventListener('submit', (e) => {
+            document.getElementById('addContactForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = {};
@@ -135,6 +161,53 @@
                             }
                         ]
                     }),
+                }).then(response => {
+                    if (response.ok) {
+                        e.target.reset(); // Clear the form values upon successful submit
+                        document.getElementById('customFieldsContainer').innerHTML = ''; // Clear custom fields as well
+                    }
+                });
+            });
+
+            // HTTP POST request to /post path
+            // based on the form data
+            document.getElementById('addPeerForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = {};
+                for (const [key, value] of formData.entries()) {
+                    data[key] = value;
+                }
+                let peer = formData.get('peer');
+                if (!peer.endsWith('@contacts:crdt-crm:mothu.eth')) {
+                    peer = peer + '@contacts:crdt-crm:mothu.eth';
+                }
+                fetch('/contacts:crdt-crm:mothu.eth/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        "AddPeer": [
+                            peer,
+                            "ReadWrite"
+                        ]
+                    }),
+                }).then(response => {
+                    if (response.ok) {
+                        e.target.reset(); // Clear the form values upon successful submit
+                    }
+                });
+            });
+
+            document.getElementById('clearStateForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                fetch('/contacts:crdt-crm:mothu.eth/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ "ClearState": our }),
                 });
             });
         </script>

@@ -1,6 +1,7 @@
 html,
 body {
-    background-color: #f0f4f8;
+    background-color: #E8F0FE;
+    /* Light blue background */
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -10,25 +11,28 @@ main {
     max-width: 800px;
     margin: 20px auto;
     padding: 20px;
-    background-color: #ffffff;
+    background-color: #FFFFFF;
+    /* White background for contrast */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-    color: #333;
+    color: #4A90E2;
+    /* Darker blue for headers */
     font-size: 1.5em;
-    /* Reduced size for headers */
 }
 
 h2 {
-    color: #333;
+    color: #50B4FC;
+    /* Lighter blue for sub-headers */
     font-size: 1em;
 }
 
 .contact,
 .peer {
     background-color: #fff;
-    border: 1px solid #ddd;
+    border: 1px solid #B3DAF1;
+    /* Light blue border */
     padding: 8px;
     margin: 5px;
     border-radius: 8px;
@@ -48,60 +52,60 @@ h2 {
 .socials span {
     display: inline-block;
     margin-right: 5px;
-    /* Reduced margin */
     font-size: 0.8em;
-    /* Reduced font size */
+    color: #7A92A5;
+    /* Soft grey for social info */
 }
 
 .peer {
     padding: 5px;
     margin: 5px 0;
-    /* Reduced margin */
     display: inline-block;
     width: calc(50% - 20px);
     box-sizing: border-box;
 }
 
 form {
-    background-color: #f9f9f9;
+    background-color: #F4F9FD;
+    /* Very light blue for form background */
     padding: 15px;
-    /* Reduced padding */
     border-radius: 8px;
     margin-bottom: 15px;
-    /* Reduced margin */
 }
 
 form label {
     margin-right: 5px;
-    /* Reduced margin */
     font-size: 0.9em;
-    /* Reduced font size */
+    color: #4A90E2;
+    /* Darker blue for form labels */
 }
 
-form input[type="text"],
-form input[type="email"],
-form input[type="tel"] {
+form input {
     padding: 8px;
-    /* Reduced padding */
     margin-bottom: 8px;
-    /* Reduced margin */
-    border: 1px solid #ddd;
+    border: 1px solid #B3DAF1;
+    /* Light blue border for inputs */
     border-radius: 4px;
     width: calc(100% - 22px);
 }
 
 form button[type="submit"] {
     background-color: #007bff;
+    /* Bright blue for submit button */
     color: white;
     padding: 8px 12px;
-    /* Adjusted padding */
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9em;
-    /* Reduced font size */
+}
+
+#clearStateForm button {
+    background-color: red;
+    color: white;
 }
 
 form button[type="submit"]:hover {
     background-color: #0056b3;
+    /* Darker blue on hover */
 }

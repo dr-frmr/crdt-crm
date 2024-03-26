@@ -1,22 +1,22 @@
 use autosurgeon::{Hydrate, Reconcile};
 use kinode_process_lib::Address;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
 pub struct ContactBook {
     /// The contacts in the address book.
-    pub contacts: HashMap<String, Contact>,
+    pub contacts: BTreeMap<String, Contact>,
     /// The peers that have a copy of the address book and can make changes.
-    #[autosurgeon(with = "autosurgeon::map_with_parseable_keys")]
-    pub peers: HashMap<Address, PeerStatus>,
+    /// keys are addresses.to_string()
+    pub peers: BTreeMap<String, PeerStatus>,
 }
 
 impl ContactBook {
     pub fn default(our: &Address) -> Self {
         Self {
-            contacts: HashMap::new(),
-            peers: HashMap::from([(our.clone(), PeerStatus::ReadWrite)]),
+            contacts: BTreeMap::new(),
+            peers: BTreeMap::from([(our.to_string(), PeerStatus::ReadWrite)]),
         }
     }
 
@@ -49,12 +49,16 @@ impl ContactBook {
                     .ok_or(anyhow::anyhow!("contact not found"))?;
             }
             Update::AddPeer(address, status) => {
-                self.peers.insert(address, status);
+                self.peers.insert(address.to_string(), status);
             }
             Update::RemovePeer(address) => {
                 self.peers
-                    .remove(&address)
+                    .remove(&address.to_string())
                     .ok_or(anyhow::anyhow!("peer not found"))?;
+            }
+            Update::ClearState(our_address) => {
+                self.contacts.clear();
+                self.peers = BTreeMap::from([(our_address, PeerStatus::ReadWrite)]);
             }
         }
         Ok(())
@@ -71,7 +75,7 @@ pub enum PeerStatus {
 #[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
 pub struct Contact {
     description: String,
-    socials: HashMap<String, String>,
+    socials: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -83,6 +87,8 @@ pub enum Update {
     RemoveContactSocial(String, String),
     AddPeer(Address, PeerStatus),
     RemovePeer(Address),
+    /// Only usable locally. Our own address as string should be argument.
+    ClearState(String),
 }
 
 pub type ContactResponse = Result<(), ContactError>;

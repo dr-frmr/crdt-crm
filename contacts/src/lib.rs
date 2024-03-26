@@ -127,14 +127,31 @@ fn handle_local_message(
             .send()?;
     }
 
+    // if update was to clear state, send all peers a RemovePeer update
+    if let Update::ClearState(_) = &update {
+        for (peer, _status) in &contact_book.peers {
+            let peer_addr: Address = peer.parse()?;
+            if &peer_addr != our {
+                Request::to(peer_addr)
+                    .body(serde_json::to_vec(&Update::RemovePeer(our.clone()))?)
+                    .context(peer.to_string())
+                    .expects_response(30)
+                    .send()?;
+            }
+        }
+    }
+
     let serialized_update = serde_json::to_vec(&update)?;
     contact_book.apply_update(update)?;
     reconcile(crdt, &contact_book).unwrap();
 
+    send_ws_updates(&crdt, ws_channels);
+
     // send update to all peers
     for (peer, _status) in &contact_book.peers {
-        if peer != our {
-            Request::to(peer)
+        let peer_addr: Address = peer.parse()?;
+        if &peer_addr != our {
+            Request::to(peer_addr)
                 .body(serialized_update.clone())
                 .context(peer.to_string())
                 .expects_response(30)
@@ -142,19 +159,6 @@ fn handle_local_message(
         }
     }
 
-    for channel_id in ws_channels.iter() {
-        println!("sending ws update");
-        http::send_ws_push(
-            *channel_id,
-            http::WsMessageType::Text,
-            kinode_process_lib::LazyLoadBlob {
-                mime: Some("application/json".to_string()),
-                bytes: serde_json::to_vec(&contact_book).unwrap(),
-            },
-        );
-    }
-
-    println!("state: {:?}", contact_book);
     kinode_process_lib::set_state(&crdt.save_nocompress());
     Ok(())
 }
@@ -164,9 +168,10 @@ fn handle_remote_message(
     crdt: &mut AutoCommit,
     ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<()> {
-    let mut contact_book: ContactBook = hydrate(crdt)?;
+    let mut fork = crdt.fork().with_actor(automerge::ActorId::random());
+    let mut contact_book: ContactBook = hydrate(&fork)?;
 
-    let Some(status) = contact_book.peers.get(&message.source()) else {
+    let Some(status) = contact_book.peers.get(&message.source().to_string()) else {
         return respond(ContactResponse::Err(ContactError::UnknownPeer));
     };
     if *status != PeerStatus::ReadWrite {
@@ -174,18 +179,52 @@ fn handle_remote_message(
     };
 
     match serde_json::from_slice::<Update>(message.body()) {
+        Ok(Update::ClearState(_)) => {
+            // we don't accept this from others!
+            return respond(ContactResponse::Err(ContactError::BadUpdate));
+        }
         Ok(book_update) => {
+            println!("received update from {}", message.source());
             contact_book.apply_update(book_update)?;
-            reconcile(crdt, &contact_book)?;
+            reconcile(&mut fork, &contact_book)?;
         }
         Err(_) => {
+            println!("received full sync from {}", message.source());
             let full_book_sync: ContactBook = serde_json::from_slice(message.body())?;
-            reconcile(crdt, &full_book_sync)?;
+            // we don't want to reconcile here, because we're getting a full sync
+            // instead, "merge" the two contact books in a purely-additive way
+            for (id, contact) in full_book_sync.contacts {
+                if !contact_book.contacts.contains_key(&id) {
+                    contact_book.contacts.insert(id, contact);
+                }
+            }
+            for (peer, status) in full_book_sync.peers {
+                if !contact_book.peers.contains_key(&peer) {
+                    contact_book.peers.insert(peer, status);
+                }
+            }
+            // and then reconcile
+            reconcile(&mut fork, &contact_book)?;
         }
     };
 
+    crdt.merge(&mut fork)?;
+
+    send_ws_updates(&crdt, ws_channels);
+
+    kinode_process_lib::set_state(&crdt.save_nocompress());
+    Ok(())
+}
+
+fn respond(response: ContactResponse) -> anyhow::Result<()> {
+    Response::new()
+        .body(serde_json::to_vec(&response).unwrap())
+        .send()
+}
+
+fn send_ws_updates(crdt: &AutoCommit, ws_channels: &HashSet<u32>) {
+    let contact_book: ContactBook = hydrate(crdt).unwrap();
     for channel_id in ws_channels.iter() {
-        println!("sending ws update");
         http::send_ws_push(
             *channel_id,
             http::WsMessageType::Text,
@@ -195,16 +234,6 @@ fn handle_remote_message(
             },
         );
     }
-
-    println!("state: {:?}", contact_book);
-    kinode_process_lib::set_state(&crdt.save_nocompress());
-    Ok(())
-}
-
-fn respond(response: ContactResponse) -> anyhow::Result<()> {
-    Response::new()
-        .body(serde_json::to_vec(&response).unwrap())
-        .send()
 }
 
 fn handle_http_request(
@@ -280,7 +309,6 @@ fn serve_http_paths(
             let json_bytes = kinode_process_lib::get_blob()
                 .ok_or(anyhow::anyhow!("http POST without body"))?
                 .bytes;
-            println!("json: {}", std::str::from_utf8(&json_bytes)?);
             let update: Update = serde_json::from_slice(&json_bytes)?;
             handle_local_message(&our, update, crdt, ws_channels)?;
             Ok((http::StatusCode::OK, vec![]))

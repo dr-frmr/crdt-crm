@@ -12,13 +12,6 @@
 
 <body>
     <main>
-        <form action="/contacts:crdt-crm:mothu.eth/post" method="post">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" required>
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
-            <button type="submit">Add</button>
-        </form>
         <h1>Contacts</h1>
 
         <div id="contacts"></div>
@@ -27,16 +20,45 @@
 
         <div id="peers"></div>
 
+        <h1>Add Contact</h1>
+
+        <form id="addContactForm">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required>
+            <br>
+            <label for="desc">Description:</label>
+            <input type="text" id="desc" name="desc" required>
+            <br>
+            <div id="customFieldsContainer"></div>
+            <button type="button" id="addCustomFieldBtn">Add Custom Field</button>
+            <br>
+            <button type="submit">Add</button>
+        </form>
+
         <script>
+            document.getElementById('addCustomFieldBtn').addEventListener('click', function () {
+                const container = document.getElementById('customFieldsContainer');
+                const inputGroup = document.createElement('div');
+                inputGroup.innerHTML = `
+                    <input type="text" placeholder="Field Name" name="customFieldName[]" required>
+                    <input type="text" placeholder="Field Value" name="customFieldValue[]" required>
+                    <button type="button" class="removeFieldBtn">X</button>
+                `;
+                container.appendChild(inputGroup);
+
+                inputGroup.querySelector('.removeFieldBtn').addEventListener('click', function () {
+                    inputGroup.remove();
+                });
+            });
+
             // HTTP GET request for /state path
             // then display the result in the page
             fetch('/contacts:crdt-crm:mothu.eth/state')
                 .then(response => response.json())
                 .then(data => {
-                    // display the data as a string
-                    document.getElementById("contacts").innerHTML = JSON.stringify(data.contacts);
-                    document.getElementById("peers").innerHTML = JSON.stringify(data.peers);
+                    updateContactsAndPeers(data);
                 });
+
             // connect to /updates websocket and listen for updates
             // when we receive an update, display it in the page
             var url = document.URL + 'updates';
@@ -45,11 +67,76 @@
             url = url.replace(/^https/, 'wss');
             const ws = new WebSocket(url);
             ws.onmessage = event => {
-                console.log(event.data);
                 const data = JSON.parse(event.data);
-                document.getElementById("contacts").innerHTML = JSON.stringify(data.contacts);
-                document.getElementById("peers").innerHTML = JSON.stringify(data.peers);
+                updateContactsAndPeers(data);
             };
+
+            function updateContactsAndPeers(data) {
+                // Convert contacts to a properly formatted HTML structure
+                const contactsHtml = Object.entries(data.contacts).map(([id, contact]) => {
+                    return `<div class="contact">
+                                <h2>${id}</h2>
+                                <p>Description: ${contact.description}</p>
+                                <div class="socials">${Object.entries(contact.socials).map(([key, value]) => `<span>${key}: ${value}</span>`).join(', ')}</div>
+                                <button type="button" class="deleteContactBtn" data-contact-id="${id}">Delete</button>
+                            </div>`;
+                }).join('');
+                document.getElementById("contacts").innerHTML = contactsHtml;
+
+                // Add event listeners for delete buttons
+                document.querySelectorAll('.deleteContactBtn').forEach(button => {
+                    button.addEventListener('click', function () {
+                        const contactId = this.getAttribute('data-contact-id');
+                        fetch('/contacts:crdt-crm:mothu.eth/post', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ "RemoveContact": contactId }),
+                        });
+                    });
+                });
+
+                // Convert peers to a properly formatted HTML structure
+                const peersHtml = Object.entries(data.peers).map(([address, status]) => {
+                    return `<div class="peer">
+                                <h2>${address.split('@')[0]}</h2>
+                                <p>Status: ${status}</p>
+                            </div>`;
+                }).join('');
+                document.getElementById("peers").innerHTML = peersHtml;
+            }
+
+            // HTTP POST request to /post path
+            // based on the form data
+            document.querySelector('form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = {};
+                for (const [key, value] of formData.entries()) {
+                    data[key] = value;
+                }
+                fetch('/contacts:crdt-crm:mothu.eth/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        "AddContact": [
+                            formData.get('name'),
+                            {
+                                "description": formData.get('desc'),
+                                "socials": Object.fromEntries(
+                                    formData.getAll('customFieldName[]').map((fieldName, index) => [
+                                        fieldName,
+                                        formData.getAll('customFieldValue[]')[index]
+                                    ])
+                                )
+                            }
+                        ]
+                    }),
+                });
+            });
         </script>
     </main>
 </body>

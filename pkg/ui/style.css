@@ -1,4 +1,107 @@
 html,
 body {
-    background-color: aliceblue;
+    background-color: #f0f4f8;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+main {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #333;
+    font-size: 1.5em;
+    /* Reduced size for headers */
+}
+
+h2 {
+    color: #333;
+    font-size: 1em;
+}
+
+.contact,
+.peer {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 8px;
+    transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+    display: inline-block;
+    width: calc(50% - 10px);
+    box-sizing: border-box;
+    vertical-align: top;
+}
+
+.contact:hover,
+.peer:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    transform: translateY(-5px);
+}
+
+.socials span {
+    display: inline-block;
+    margin-right: 5px;
+    /* Reduced margin */
+    font-size: 0.8em;
+    /* Reduced font size */
+}
+
+.peer {
+    padding: 5px;
+    margin: 5px 0;
+    /* Reduced margin */
+    display: inline-block;
+    width: calc(50% - 20px);
+    box-sizing: border-box;
+}
+
+form {
+    background-color: #f9f9f9;
+    padding: 15px;
+    /* Reduced padding */
+    border-radius: 8px;
+    margin-bottom: 15px;
+    /* Reduced margin */
+}
+
+form label {
+    margin-right: 5px;
+    /* Reduced margin */
+    font-size: 0.9em;
+    /* Reduced font size */
+}
+
+form input[type="text"],
+form input[type="email"],
+form input[type="tel"] {
+    padding: 8px;
+    /* Reduced padding */
+    margin-bottom: 8px;
+    /* Reduced margin */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: calc(100% - 22px);
+}
+
+form button[type="submit"] {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 12px;
+    /* Adjusted padding */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    /* Reduced font size */
+}
+
+form button[type="submit"]:hover {
+    background-color: #0056b3;
 }

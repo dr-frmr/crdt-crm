@@ -277,11 +277,11 @@ fn serve_http_paths(
             if method != http::Method::POST {
                 return Ok((http::StatusCode::METHOD_NOT_ALLOWED, vec![]));
             }
-            let update: Update = serde_json::from_slice(
-                &kinode_process_lib::get_blob()
-                    .ok_or(anyhow::anyhow!("http POST without body"))?
-                    .bytes,
-            )?;
+            let json_bytes = kinode_process_lib::get_blob()
+                .ok_or(anyhow::anyhow!("http POST without body"))?
+                .bytes;
+            println!("json: {}", std::str::from_utf8(&json_bytes)?);
+            let update: Update = serde_json::from_slice(&json_bytes)?;
             handle_local_message(&our, update, crdt, ws_channels)?;
             Ok((http::StatusCode::OK, vec![]))
         }

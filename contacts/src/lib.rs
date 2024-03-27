@@ -118,16 +118,8 @@ fn handle_local_message(
 ) -> anyhow::Result<()> {
     let mut contact_book: ContactBook = hydrate(crdt)?;
 
-    // if update was to add a peer, send them the full state
-    if let Update::AddPeer(peer, _status) = &update {
-        Request::to(peer)
-            .body(serde_json::to_vec(&contact_book)?)
-            .context(peer.to_string())
-            .expects_response(30)
-            .send()?;
-    }
-
     // if update was to clear state, send all peers a RemovePeer update
+    // (so that we don't clear their state as well)
     if let Update::ClearState(_) = &update {
         for (peer, _status) in &contact_book.peers {
             let peer_addr: Address = peer.parse()?;
@@ -141,7 +133,6 @@ fn handle_local_message(
         }
     }
 
-    let serialized_update = serde_json::to_vec(&update)?;
     contact_book.apply_update(update)?;
     reconcile(crdt, &contact_book).unwrap();
 
@@ -152,7 +143,7 @@ fn handle_local_message(
         let peer_addr: Address = peer.parse()?;
         if &peer_addr != our {
             Request::to(peer_addr)
-                .body(serialized_update.clone())
+                .body(crdt.save())
                 .context(peer.to_string())
                 .expects_response(30)
                 .send()?;
@@ -168,8 +159,7 @@ fn handle_remote_message(
     crdt: &mut AutoCommit,
     ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<()> {
-    let mut fork = crdt.fork().with_actor(automerge::ActorId::random());
-    let mut contact_book: ContactBook = hydrate(&fork)?;
+    let contact_book: ContactBook = hydrate(crdt)?;
 
     let Some(status) = contact_book.peers.get(&message.source().to_string()) else {
         return respond(ContactResponse::Err(ContactError::UnknownPeer));
@@ -178,37 +168,11 @@ fn handle_remote_message(
         return respond(ContactResponse::Err(ContactError::ReadOnlyPeer));
     };
 
-    match serde_json::from_slice::<Update>(message.body()) {
-        Ok(Update::ClearState(_)) => {
-            // we don't accept this from others!
-            return respond(ContactResponse::Err(ContactError::BadUpdate));
-        }
-        Ok(book_update) => {
-            println!("received update from {}", message.source());
-            contact_book.apply_update(book_update)?;
-            reconcile(&mut fork, &contact_book)?;
-        }
-        Err(_) => {
-            println!("received full sync from {}", message.source());
-            let full_book_sync: ContactBook = serde_json::from_slice(message.body())?;
-            // we don't want to reconcile here, because we're getting a full sync
-            // instead, "merge" the two contact books in a purely-additive way
-            for (id, contact) in full_book_sync.contacts {
-                if !contact_book.contacts.contains_key(&id) {
-                    contact_book.contacts.insert(id, contact);
-                }
-            }
-            for (peer, status) in full_book_sync.peers {
-                if !contact_book.peers.contains_key(&peer) {
-                    contact_book.peers.insert(peer, status);
-                }
-            }
-            // and then reconcile
-            reconcile(&mut fork, &contact_book)?;
-        }
-    };
+    let mut their_fork =
+        AutoCommit::load(message.body())?.with_actor(message.source().node().as_bytes().into());
 
-    crdt.merge(&mut fork)?;
+    println!("merging update from {}", message.source().node());
+    crdt.merge(&mut their_fork)?;
 
     send_ws_updates(&crdt, ws_channels);
 

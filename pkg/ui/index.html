@@ -102,8 +102,16 @@
                 const contactsHtml = Object.entries(data.contacts).map(([id, contact]) => {
                     return `<div class="contact">
                                 <h2>${id}</h2>
-                                <p>Description: ${contact.description}</p>
-                                <div class="socials">${Object.entries(contact.socials).map(([key, value]) => `<span>${key}: ${value}</span>`).join(', ')}</div>
+                                <p class="editableDescription" contenteditable="false" data-contact-id="${id}">${contact.description}</p>
+                                <div class="socials">${Object.entries(contact.socials).map(([key, value]) => `
+                                    <span class="editableSocial" contenteditable="false" data-contact-id="${id}" data-social-key="${key}">${key}: ${value}</span>
+                                    <button type="button" class="removeSocialBtn" data-contact-id="${id}" data-social-key="${key}">Remove</button>
+                                `).join('<br>')}</div>
+                                <div class="addSocialForm" data-contact-id="${id}">
+                                    <input type="text" placeholder="Social Media Name" class="socialKeyInput">
+                                    <input type="text" placeholder="Social Media Handle" class="socialValueInput">
+                                    <button type="button" class="submitSocialBtn">Add Social</button>
+                                </div>
                                 <button type="button" class="deleteContactBtn" data-contact-id="${id}">Delete</button>
                             </div>`;
                 }).join('');
@@ -120,6 +128,88 @@
                             },
                             body: JSON.stringify({ "RemoveContact": contactId }),
                         });
+                    });
+                });
+
+                // Make description fields editable on click and save on enter
+                document.querySelectorAll('.editableDescription').forEach(description => {
+                    description.addEventListener('click', function () {
+                        this.contentEditable = true;
+                        this.focus();
+                    });
+                    description.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.contentEditable = false;
+                            const newDescription = this.innerText;
+                            const contactId = this.getAttribute('data-contact-id');
+                            fetch('/contacts:crdt-crm:mothu.eth/post', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ "EditContactDescription": [contactId, newDescription] }),
+                            });
+                        }
+                    });
+                });
+
+                // Add event listeners for socials edit and remove buttons
+                document.querySelectorAll('.editableSocial').forEach(social => {
+                    social.addEventListener('click', function () {
+                        this.contentEditable = true;
+                        this.focus();
+                    });
+                    social.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.contentEditable = false;
+                            const newSocialValue = this.innerText.split(': ')[1];
+                            const contactId = this.getAttribute('data-contact-id');
+                            const socialKey = this.getAttribute('data-social-key');
+                            fetch('/contacts:crdt-crm:mothu.eth/post', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ "EditContactSocial": [contactId, socialKey, newSocialValue] }),
+                            });
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.removeSocialBtn').forEach(button => {
+                    button.addEventListener('click', function () {
+                        const contactId = this.getAttribute('data-contact-id');
+                        const socialKey = this.getAttribute('data-social-key');
+                        fetch('/contacts:crdt-crm:mothu.eth/post', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ "RemoveContactSocial": [contactId, socialKey] }),
+                        });
+                    });
+                });
+
+                // Add event listener for add social button within the form
+                document.querySelectorAll('.submitSocialBtn').forEach(button => {
+                    button.addEventListener('click', function () {
+                        const contactId = this.closest('.addSocialForm').getAttribute('data-contact-id');
+                        const socialKey = this.previousElementSibling.previousElementSibling.value;
+                        const socialValue = this.previousElementSibling.value;
+                        if (socialKey && socialValue) {
+                            fetch('/contacts:crdt-crm:mothu.eth/post', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ "EditContactSocial": [contactId, socialKey, socialValue] }),
+                            }).then(() => {
+                                this.previousElementSibling.previousElementSibling.value = ''; // Clear the social media name input
+                                this.previousElementSibling.value = ''; // Clear the social media handle input
+                            });
+                        }
                     });
                 });
 

@@ -2,81 +2,108 @@ html,
 body {
     background-color: #E8F0FE;
     /* Light blue background */
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
+    color: #333;
 }
 
 main {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 20px;
-    background-color: #FFFFFF;
-    /* White background for contrast */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 960px;
+    /* Slightly wider main area */
+    margin: 40px auto;
+    /* More vertical margin for breathing room */
+    padding: 40px;
+    /* More padding for a spacious look */
+    background-color: #FAFAFA;
+    /* Off-white background for contrast */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    /* Slightly deeper shadow for depth */
+    border-radius: 10px;
+    /* Rounded corners for a softer look */
+}
+
+h1,
+h2 {
+    font-weight: 600;
+    /* Slightly bolder headers */
 }
 
 h1 {
     color: #4A90E2;
     /* Darker blue for headers */
-    font-size: 1.5em;
+    font-size: 2em;
+    /* Larger main headers */
+    margin-bottom: 20px;
+    /* More space below main headers */
 }
 
 h2 {
     color: #50B4FC;
     /* Lighter blue for sub-headers */
-    font-size: 1em;
+    font-size: 1.5em;
+    /* Larger sub-headers */
+    margin-bottom: 15px;
+    /* More space below sub-headers */
 }
 
 .contact,
 .peer {
-    background-color: #fff;
-    border: 1px solid #B3DAF1;
-    /* Light blue border */
-    padding: 8px;
-    margin: 5px;
-    border-radius: 8px;
+    background-color: #FAFAFA;
+    border: 2px solid #B3DAF1;
+    /* Slightly thicker light blue border */
+    padding: 15px;
+    /* More padding for a roomier feel */
+    margin: 10px 0;
+    /* More vertical margin, removed horizontal margin */
+    border-radius: 10px;
+    /* Rounded corners for a softer look */
     transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
-    display: inline-block;
-    width: calc(50% - 10px);
+    display: block;
+    /* Make these elements block for better structure */
+    width: auto;
+    /* Auto width for full-width blocks */
     box-sizing: border-box;
-    vertical-align: top;
 }
 
 .contact:hover,
 .peer:hover {
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    /* Deeper shadow on hover */
+    transform: translateY(-3px);
+    /* Less vertical movement on hover for subtlety */
 }
 
 .socials span {
     display: inline-block;
-    margin-right: 5px;
-    font-size: 0.8em;
+    margin-right: 10px;
+    /* More space between social icons */
+    font-size: 1em;
+    /* Larger font size for better readability */
     color: #7A92A5;
     /* Soft grey for social info */
-}
-
-.peer {
-    padding: 5px;
-    margin: 5px 0;
-    display: inline-block;
-    width: calc(50% - 20px);
-    box-sizing: border-box;
 }
 
 form {
     background-color: #F4F9FD;
     /* Very light blue for form background */
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+    /* More padding for a roomier form */
+    border-radius: 10px;
+    /* Rounded corners for a softer look */
+    margin-bottom: 20px;
+    /* More space below forms */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    /* Slightly deeper shadow for depth */
 }
 
 form label {
-    margin-right: 5px;
-    font-size: 0.9em;
+    display: block;
+    /* Block display for labels for better structure */
+    margin-bottom: 5px;
+    /* Space below labels */
+    font-size: 1em;
+    /* Larger font size for better readability */
     color: #4A90E2;
     /* Darker blue for form labels */
 }
@@ -84,12 +111,16 @@ form label {
 form input,
 form button[type="submit"],
 form button[type="button"] {
-    padding: 8px;
-    margin-bottom: 8px;
-    border: 1px solid #B3DAF1;
-    /* Light blue border for inputs */
-    border-radius: 4px;
-    width: calc(100% - 22px);
+    padding: 10px;
+    /* More padding for larger, easier-to-click elements */
+    margin-bottom: 15px;
+    /* More space between form elements */
+    border: 2px solid #B3DAF1;
+    /* Slightly thicker light blue border */
+    border-radius: 5px;
+    /* Rounded corners for a softer look */
+    width: calc(100% - 24px);
+    /* Adjust width calculation for thicker borders */
     box-sizing: border-box;
     transition: background-color 0.3s, border-color 0.3s;
 }
@@ -108,7 +139,8 @@ form button[type="button"] {
     /* Bright blue for buttons */
     color: white;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 1em;
+    /* Larger font size for better readability */
     transition: background-color 0.3s;
 }
 
@@ -118,37 +150,31 @@ form button[type="button"]:hover {
     /* Darker blue on hover */
 }
 
-#clearStateForm button {
-    background-color: #D9534F;
-    /* Red for clear state button */
-    color: white;
-}
-
-#addCustomFieldBtn {
-    background-color: #5CB85C;
-    /* Green for add field button */
-    color: white;
-    margin-bottom: 15px;
-}
-
+#clearStateForm button,
 .removeFieldBtn {
     background-color: #D9534F;
-    /* Red for remove field button */
+    /* Red for clear state and remove field buttons */
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 5px;
+    /* Rounded corners for a softer look */
     cursor: pointer;
-    padding: 0 5px;
+    padding: 10px 15px;
+    /* More padding for a larger, easier-to-click button */
 }
 
+#addCustomFieldBtn,
 .removeFieldBtn:hover {
-    background-color: #C9302C;
-    /* Darker red on hover */
+    background-color: #5CB85C;
+    /* Green for add field button, darker red on hover for remove button */
+    color: white;
+    margin-bottom: 15px;
+    /* More space below the add field button */
 }
 
 form input {
-    background-color: #FFFFFF;
-    /* White background for inputs */
+    background-color: #FAFAFA;
+    /* Off-white background for inputs */
 }
 
 form input:hover {

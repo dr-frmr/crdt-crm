@@ -1,8 +1,8 @@
-use crate::PeerStatus;
+use crate::{Contact, ContactBook, PeerStatus, Update};
 use automerge::AutoCommit;
 use kinode_process_lib::{Address, Message, Request};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +27,27 @@ pub struct State {
 }
 
 impl State {
+    pub fn new(our: &Address) -> Self {
+        let mut state = Self::default();
+        let book_id = Uuid::new_v4();
+        let mut crdt = AutoCommit::default();
+        let mut contact_book = ContactBook::new("My Contacts".to_string(), our);
+        contact_book
+            .apply_update(Update::AddContact(
+                "Doria".to_string(),
+                Contact {
+                    description: Some("Developer @ Kinode".to_string()),
+                    socials: BTreeMap::from([(
+                        "twitter".to_string(),
+                        "https://twitter.com/m_e_doria".to_string(),
+                    )]),
+                },
+            ))
+            .unwrap();
+        autosurgeon::reconcile(&mut crdt, &contact_book).unwrap();
+        state.add_book(book_id, crdt);
+        state
+    }
     pub fn add_book(&mut self, book_id: Uuid, book: AutoCommit) {
         self.books.insert(book_id, book);
     }
@@ -39,7 +60,7 @@ impl State {
     pub fn get_book_mut(&mut self, book_id: &Uuid) -> Option<&mut AutoCommit> {
         self.books.get_mut(book_id)
     }
-    pub fn get_books_hydrated(&self) -> HashMap<Uuid, crate::ContactBook> {
+    pub fn get_books_hydrated(&self) -> HashMap<Uuid, ContactBook> {
         self.books
             .iter()
             .map(|(k, v)| (*k, autosurgeon::hydrate(v).unwrap()))
@@ -83,7 +104,7 @@ impl Serialize for State {
     where
         S: serde::Serializer,
     {
-        let mut ser = serializer.serialize_struct("State", 2)?;
+        let mut ser = serializer.serialize_struct("State", 4)?;
         let books_as_bytes: HashMap<Uuid, Vec<u8>> = self
             .books
             .iter()
@@ -91,6 +112,7 @@ impl Serialize for State {
             .collect();
         ser.serialize_field("books", &books_as_bytes)?;
         ser.serialize_field("pending_invites", &self.pending_invites)?;
+        ser.serialize_field("outgoing_invites", &self.outgoing_invites)?;
         ser.serialize_field("failed_messages", &self.failed_messages)?;
         ser.end()
     }

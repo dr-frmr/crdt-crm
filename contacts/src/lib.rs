@@ -33,7 +33,9 @@ fn init(our: Address) {
         state
     } else {
         println!("generating new state");
-        State::default()
+        let state = State::new(&our);
+        kinode_process_lib::set_state(&serde_json::to_vec(&state).unwrap());
+        state
     };
 
     let mut ws_channels: HashSet<u32> = HashSet::new();

@@ -81,8 +81,8 @@ pub enum PeerStatus {
 
 #[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
 pub struct Contact {
-    description: Option<String>,
-    socials: BTreeMap<String, String>,
+    pub description: Option<String>,
+    pub socials: BTreeMap<String, String>,
 }
 
 mod autosurgeon_address {

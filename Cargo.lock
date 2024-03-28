@@ -474,6 +474,7 @@ dependencies = [
  "kinode_process_lib",
  "serde",
  "serde_json",
+ "uuid",
  "wit-bindgen",
 ]
 

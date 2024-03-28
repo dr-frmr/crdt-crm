@@ -71,6 +71,7 @@ form {
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 form label {
@@ -80,32 +81,77 @@ form label {
     /* Darker blue for form labels */
 }
 
-form input {
+form input,
+form button[type="submit"],
+form button[type="button"] {
     padding: 8px;
     margin-bottom: 8px;
     border: 1px solid #B3DAF1;
     /* Light blue border for inputs */
     border-radius: 4px;
     width: calc(100% - 22px);
+    box-sizing: border-box;
+    transition: background-color 0.3s, border-color 0.3s;
 }
 
-form button[type="submit"] {
+form input:focus,
+form button[type="submit"]:focus,
+form button[type="button"]:focus {
+    border-color: #4A90E2;
+    /* Darker blue for focus */
+    outline: none;
+}
+
+form button[type="submit"],
+form button[type="button"] {
     background-color: #007bff;
-    /* Bright blue for submit button */
+    /* Bright blue for buttons */
     color: white;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
     cursor: pointer;
     font-size: 0.9em;
+    transition: background-color 0.3s;
+}
+
+form button[type="submit"]:hover,
+form button[type="button"]:hover {
+    background-color: #0056b3;
+    /* Darker blue on hover */
 }
 
 #clearStateForm button {
-    background-color: red;
+    background-color: #D9534F;
+    /* Red for clear state button */
     color: white;
 }
 
-form button[type="submit"]:hover {
-    background-color: #0056b3;
-    /* Darker blue on hover */
+#addCustomFieldBtn {
+    background-color: #5CB85C;
+    /* Green for add field button */
+    color: white;
+    margin-bottom: 15px;
+}
+
+.removeFieldBtn {
+    background-color: #D9534F;
+    /* Red for remove field button */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.removeFieldBtn:hover {
+    background-color: #C9302C;
+    /* Darker red on hover */
+}
+
+form input {
+    background-color: #FFFFFF;
+    /* White background for inputs */
+}
+
+form input:hover {
+    background-color: #F4F9FD;
+    /* Very light blue on hover */
 }

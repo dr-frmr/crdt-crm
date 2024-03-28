@@ -1,10 +1,18 @@
+use crate::api::Update;
 use autosurgeon::{Hydrate, Reconcile};
 use kinode_process_lib::Address;
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::BTreeMap;
 
+/// A "rolodex". A collection of contacts and peers that can make changes.
+/// The owner is the user that originally created the book. Only they
+/// can change the name. Everything else can be changed by any ReadWrite peer.
+/// The owner cannot change or be removed from the peers list.
 #[derive(Debug, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
 pub struct ContactBook {
+    pub name: String,
+    #[autosurgeon(with = "autosurgeon_address")]
+    pub owner: Address,
     /// The contacts in the address book.
     pub contacts: BTreeMap<String, Contact>,
     /// The peers that have a copy of the address book and can make changes.
@@ -13,30 +21,19 @@ pub struct ContactBook {
 }
 
 impl ContactBook {
-    pub fn default(our: &Address) -> Self {
+    pub fn new(name: String, our: &Address) -> Self {
         Self {
+            name,
+            owner: our.clone(),
             contacts: BTreeMap::new(),
-            peers: BTreeMap::from([(our.to_string(), PeerStatus::ReadWrite)]),
+            peers: BTreeMap::from([(our.to_string(), PeerStatus::Owner)]),
         }
     }
 
     pub fn apply_update(&mut self, update: Update) -> anyhow::Result<()> {
         match update {
             Update::AddContact(id, contact) => {
-                let entry = self.contacts.entry(id);
-                match entry {
-                    Entry::Occupied(_) => {
-                        entry.and_modify(|c| {
-                            if contact.description.is_some() {
-                                c.description = contact.description;
-                            }
-                            c.socials.extend(contact.socials);
-                        });
-                    }
-                    Entry::Vacant(_) => {
-                        entry.or_insert(contact);
-                    }
-                }
+                self.contacts.insert(id, contact);
             }
             Update::RemoveContact(id) => {
                 self.contacts
@@ -69,10 +66,6 @@ impl ContactBook {
                     .remove(&address.to_string())
                     .ok_or(anyhow::anyhow!("peer not found"))?;
             }
-            Update::ClearState(our_address) => {
-                self.contacts.clear();
-                self.peers = BTreeMap::from([(our_address, PeerStatus::ReadWrite)]);
-            }
         }
         Ok(())
     }
@@ -83,6 +76,7 @@ pub enum PeerStatus {
     #[default]
     ReadOnly,
     ReadWrite,
+    Owner,
 }
 
 #[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
@@ -91,24 +85,27 @@ pub struct Contact {
     socials: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Update {
-    AddContact(String, Contact),
-    RemoveContact(String),
-    EditContactDescription(String, String),
-    EditContactSocial(String, String, String),
-    RemoveContactSocial(String, String),
-    AddPeer(Address, PeerStatus),
-    RemovePeer(Address),
-    /// Only usable locally. Our own address as string should be argument.
-    ClearState(String),
-}
+mod autosurgeon_address {
+    use autosurgeon::{Hydrate, HydrateError, Prop, ReadDoc, Reconciler};
+    use kinode_process_lib::Address;
+    pub(super) fn hydrate<'a, D: ReadDoc>(
+        doc: &D,
+        obj: &automerge::ObjId,
+        prop: Prop<'a>,
+    ) -> Result<Address, HydrateError> {
+        let inner = String::hydrate(doc, obj, prop)?;
+        inner.parse().map_err(|e| {
+            HydrateError::unexpected(
+                "a valid address",
+                format!("an address which failed to parse due to {}", e),
+            )
+        })
+    }
 
-pub type ContactResponse = Result<(), ContactError>;
-
-#[derive(Serialize, Deserialize)]
-pub enum ContactError {
-    UnknownPeer,
-    ReadOnlyPeer,
-    BadUpdate,
+    pub(super) fn reconcile<R: Reconciler>(
+        path: &Address,
+        mut reconciler: R,
+    ) -> Result<(), R::Error> {
+        reconciler.str(path.to_string())
+    }
 }

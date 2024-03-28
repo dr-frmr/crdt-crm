@@ -1,3 +1,4 @@
+use crate::PeerStatus;
 use automerge::AutoCommit;
 use kinode_process_lib::{Address, Message, Request};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
@@ -9,6 +10,7 @@ pub struct Invite {
     pub from: Address,
     pub book_name: String,
     pub book_owner: Address,
+    pub status: PeerStatus,
 }
 
 #[derive(Debug, Default)]
@@ -18,7 +20,7 @@ pub struct State {
     /// An invite to become a peer in a new contact book, and who it's from
     pending_invites: HashMap<Uuid, Invite>,
     /// Invites we've sent out that haven't been accepted or rejected yet
-    outgoing_invites: HashMap<Uuid, Address>,
+    outgoing_invites: HashMap<Uuid, (Address, PeerStatus)>,
     /// Book-syncing messages that failed to send. We retry these periodically until
     /// either they succeed or the peer is removed from the book.
     pub failed_messages: HashMap<Address, Vec<Message>>,
@@ -52,10 +54,10 @@ impl State {
     pub fn get_invites(&self) -> &HashMap<Uuid, Invite> {
         &self.pending_invites
     }
-    pub fn add_outgoing_invite(&mut self, book_id: Uuid, address: Address) {
-        self.outgoing_invites.insert(book_id, address);
+    pub fn add_outgoing_invite(&mut self, book_id: Uuid, address: Address, status: PeerStatus) {
+        self.outgoing_invites.insert(book_id, (address, status));
     }
-    pub fn get_outgoing_invite(&self, book_id: &Uuid) -> Option<&Address> {
+    pub fn get_outgoing_invite(&self, book_id: &Uuid) -> Option<&(Address, PeerStatus)> {
         self.outgoing_invites.get(book_id)
     }
     pub fn remove_outgoing_invite(&mut self, book_id: &Uuid) {
@@ -103,7 +105,7 @@ impl<'de> Deserialize<'de> for State {
         struct StateHelper {
             books: HashMap<Uuid, Vec<u8>>,
             pending_invites: HashMap<Uuid, Invite>,
-            outgoing_invites: HashMap<Uuid, Address>,
+            outgoing_invites: HashMap<Uuid, (Address, PeerStatus)>,
             failed_messages: HashMap<Address, Vec<Message>>,
         }
 

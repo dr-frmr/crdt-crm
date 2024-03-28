@@ -7,7 +7,7 @@ use uuid::Uuid;
 pub enum LocalContactsRequest {
     NewBook(String),
     RemoveBook(Uuid),
-    CreateInvite(Uuid, Address),
+    CreateInvite(Uuid, Address, PeerStatus),
     AcceptInvite(Uuid),
     RejectInvite(Uuid),
     Update(Uuid, Update),
@@ -39,6 +39,7 @@ pub enum ContactsRequest {
         book_id: Uuid,
         name: String,
         owner: Address,
+        status: PeerStatus,
     },
     InviteResponse {
         book_id: Uuid,

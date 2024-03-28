@@ -128,18 +128,19 @@ fn handle_local_message(
             handle_update(our, book_id, Update::RemovePeer(our.clone()), state)?;
             state.remove_book(&book_id);
         }
-        LocalContactsRequest::CreateInvite(book_id, address) => {
+        LocalContactsRequest::CreateInvite(book_id, address, status) => {
             let Some(crdt) = state.get_book(&book_id) else {
                 return Err(anyhow::anyhow!("book not found"));
             };
             let contact_book: ContactBook = hydrate(crdt)?;
 
-            state.add_outgoing_invite(book_id, address.clone());
+            state.add_outgoing_invite(book_id, address.clone(), status.clone());
             Request::to(&address)
                 .body(serde_json::to_vec(&ContactsRequest::Invite {
                     book_id,
                     name: contact_book.name,
                     owner: contact_book.owner,
+                    status,
                 })?)
                 .context(address.to_string())
                 .expects_response(30)
@@ -258,31 +259,33 @@ fn handle_remote_message(
             book_id,
             name,
             owner,
+            status,
         } => {
             let invite = Invite {
                 from: message.source().clone(),
                 book_name: name,
                 book_owner: owner,
+                status,
             };
             state.add_invite(book_id, invite);
         }
         ContactsRequest::InviteResponse { book_id, accepted } => {
-            let Some(address) = state.get_outgoing_invite(&book_id) else {
+            let Some((address, status)) = state.get_outgoing_invite(&book_id) else {
                 return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
             };
             if address != message.source() {
                 return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
             }
-            state.remove_outgoing_invite(&book_id);
             if accepted {
                 // send an AddPeer update to ourselves
                 return handle_update(
                     &message.source(),
                     book_id,
-                    Update::AddPeer(message.source().clone(), PeerStatus::ReadWrite),
+                    Update::AddPeer(message.source().clone(), status.clone()),
                     state,
                 );
             }
+            state.remove_outgoing_invite(&book_id);
         }
     }
     respond(Ok(()))?;

@@ -196,7 +196,13 @@ fn handle_update(
     };
 
     let removed = match &update {
-        Update::RemovePeer(address) => Some(address.clone()),
+        Update::RemovePeer(address) => {
+            if address == our {
+                None
+            } else {
+                Some(address.clone())
+            }
+        }
         _ => None,
     };
 

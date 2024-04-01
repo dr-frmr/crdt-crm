@@ -38,8 +38,8 @@ pub enum ContactsRequest {
     Invite {
         book_id: Uuid,
         name: String,
-        owner: Address,
         status: PeerStatus,
+        data: Vec<u8>,
     },
     InviteResponse {
         book_id: Uuid,

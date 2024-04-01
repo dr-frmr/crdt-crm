@@ -8,9 +8,9 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Invite {
     pub from: Address,
-    pub book_name: String,
-    pub book_owner: Address,
+    pub name: String,
     pub status: PeerStatus,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Default)]
@@ -23,7 +23,7 @@ pub struct State {
     outgoing_invites: HashMap<Uuid, (Address, PeerStatus)>,
     /// Book-syncing messages that failed to send. We retry these periodically until
     /// either they succeed or the peer is removed from the book.
-    pub failed_messages: HashMap<Address, Vec<Message>>,
+    pub failed_messages: HashMap<Address, Message>,
 }
 
 impl State {
@@ -85,15 +85,13 @@ impl State {
         self.outgoing_invites.remove(book_id);
     }
     pub fn retry_all_failed_messages(&mut self) -> anyhow::Result<()> {
-        for (target, failed_messages) in self.failed_messages.drain() {
-            println!("retrying {} messages to {}", failed_messages.len(), target);
-            for message in failed_messages {
-                Request::to(&target)
-                    .body(message.body())
-                    .context(target.to_string())
-                    .expects_response(30)
-                    .send()?;
-            }
+        for (target, failed_message) in self.failed_messages.drain() {
+            println!("retrying message to {}", target);
+            Request::to(&target)
+                .body(failed_message.body())
+                .context(target.to_string())
+                .expects_response(30)
+                .send()?;
         }
         Ok(())
     }
@@ -128,7 +126,7 @@ impl<'de> Deserialize<'de> for State {
             books: HashMap<Uuid, Vec<u8>>,
             pending_invites: HashMap<Uuid, Invite>,
             outgoing_invites: HashMap<Uuid, (Address, PeerStatus)>,
-            failed_messages: HashMap<Address, Vec<Message>>,
+            failed_messages: HashMap<Address, Message>,
         }
 
         let helper = StateHelper::deserialize(deserializer)?;

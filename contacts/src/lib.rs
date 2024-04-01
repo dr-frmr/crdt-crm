@@ -74,20 +74,18 @@ fn handle_message(
                     if !message.is_request() {
                         return Ok(());
                     }
-                    handle_local_message(
+                    return handle_local_message(
                         our,
                         serde_json::from_slice(message.body())?,
                         state,
                         ws_channels,
-                    )
-                    .or(respond(ContactsResponse::Err(ContactsError::BadSync)))
+                    );
                 }
             } else {
                 if !message.is_request() {
                     return Ok(());
                 }
-                handle_remote_message(message, state, ws_channels)
-                    .or(respond(ContactsResponse::Err(ContactsError::BadSync)))
+                return handle_remote_message(our, message, state, ws_channels);
             }
         }
         Err(send_error) => {
@@ -98,11 +96,7 @@ fn handle_message(
                     return Ok(());
                 };
                 let target: Address = std::str::from_utf8(context)?.parse()?;
-                state
-                    .failed_messages
-                    .entry(target)
-                    .or_default()
-                    .push(send_error.message);
+                state.failed_messages.insert(target, send_error.message);
             }
             Ok(())
         }
@@ -131,18 +125,18 @@ fn handle_local_message(
             state.remove_book(&book_id);
         }
         LocalContactsRequest::CreateInvite(book_id, address, status) => {
-            let Some(crdt) = state.get_book(&book_id) else {
+            let Some(crdt) = state.get_book_mut(&book_id) else {
                 return Err(anyhow::anyhow!("book not found"));
             };
             let contact_book: ContactBook = hydrate(crdt)?;
-
+            let data = crdt.save();
             state.add_outgoing_invite(book_id, address.clone(), status.clone());
             Request::to(&address)
                 .body(serde_json::to_vec(&ContactsRequest::Invite {
                     book_id,
                     name: contact_book.name,
-                    owner: contact_book.owner,
                     status,
+                    data,
                 })?)
                 .context(address.to_string())
                 .expects_response(30)
@@ -153,10 +147,7 @@ fn handle_local_message(
                 return Err(anyhow::anyhow!("invite not found"));
             };
 
-            let mut crdt = AutoCommit::default();
-            let contact_book = ContactBook::new(invite.book_name, &invite.book_owner);
-            reconcile(&mut crdt, &contact_book)?;
-            state.add_book(book_id, crdt);
+            state.add_book(book_id, AutoCommit::load(&invite.data)?);
 
             Request::to(invite.from)
                 .body(serde_json::to_vec(&ContactsRequest::InviteResponse {
@@ -196,18 +187,18 @@ fn handle_update(
     };
 
     let removed = match &update {
-        Update::RemovePeer(address) => {
-            if address == our {
-                None
-            } else {
-                Some(address.clone())
-            }
-        }
+        Update::RemovePeer(address) => Some(address.clone()),
         _ => None,
     };
 
     let mut contact_book: ContactBook = hydrate(crdt)?;
     contact_book.apply_update(update)?;
+    // if we just removed ourself, as the owner, set a new owner
+    // so that the book is not stuck
+    if removed == Some(our.clone()) && contact_book.peers.len() > 0 {
+        let new_owner = contact_book.peers.keys().next().unwrap().clone();
+        contact_book.owner = new_owner.parse()?;
+    }
     reconcile(crdt, &contact_book).unwrap();
 
     let sync_request = serde_json::to_vec(&ContactsRequest::Sync {
@@ -228,7 +219,9 @@ fn handle_update(
     }
 
     // if update was to remove a peer, send them the sync too, one final time
-    if let Some(address) = removed {
+    if let Some(address) = removed
+        && address != *our
+    {
         Request::to(&address)
             .body(sync_request)
             .context(address.to_string())
@@ -239,6 +232,7 @@ fn handle_update(
 }
 
 fn handle_remote_message(
+    our: &Address,
     message: Message,
     state: &mut State,
     ws_channels: &mut HashSet<u32>,
@@ -253,7 +247,7 @@ fn handle_remote_message(
             let Some(status) = contact_book.peers.get(&message.source().to_string()) else {
                 return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
             };
-            if *status != PeerStatus::ReadWrite {
+            if *status == PeerStatus::ReadOnly {
                 return respond(ContactsResponse::Err(ContactsError::ReadOnlyPeer));
             };
 
@@ -266,14 +260,14 @@ fn handle_remote_message(
         ContactsRequest::Invite {
             book_id,
             name,
-            owner,
             status,
+            data,
         } => {
             let invite = Invite {
                 from: message.source().clone(),
-                book_name: name,
-                book_owner: owner,
+                name,
                 status,
+                data,
             };
             state.add_invite(book_id, invite);
         }
@@ -284,16 +278,12 @@ fn handle_remote_message(
             if address != message.source() {
                 return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
             }
+            let update = Update::AddPeer(message.source().to_owned(), status.to_owned());
+            state.remove_outgoing_invite(&book_id);
             if accepted {
                 // send an AddPeer update to ourselves
-                return handle_update(
-                    &message.source(),
-                    book_id,
-                    Update::AddPeer(message.source().clone(), status.clone()),
-                    state,
-                );
+                return handle_update(our, book_id, update, state);
             }
-            state.remove_outgoing_invite(&book_id);
         }
     }
     respond(Ok(()))?;

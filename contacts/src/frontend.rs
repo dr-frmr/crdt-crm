@@ -1,5 +1,5 @@
 use crate::{LocalContactsRequest, State};
-use kinode_process_lib::{http::*, println, Address, Message};
+use kinode_process_lib::{http::*, Address, Message};
 use std::collections::HashSet;
 
 pub fn serve(our: &Address) {
@@ -110,7 +110,6 @@ pub fn serve_http_paths(
                 .ok_or(anyhow::anyhow!("http POST without body"))?
                 .bytes;
             let request: LocalContactsRequest = serde_json::from_slice(&json_bytes)?;
-            println!("request: {:?}", request);
             crate::handle_local_message(&our, request, state, ws_channels)?;
             Ok((StatusCode::OK, vec![]))
         }

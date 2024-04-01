@@ -12,11 +12,40 @@ function init() {
                     console.log(data);
                     updateContactsAndPeers(data);
                     populateContactBookSelector(data.books);
-                    populateInvites(data.invites);
+                    populateInvites(data.pending_invites);
                     enableBookCreation();
                     displaySelectedBook();
                 });
         });
+}
+
+// Populate invites
+function populateInvites(invites) {
+    // if invites is null, return
+    if (!invites) {
+        return;
+    }
+    document.getElementById("invites-container").innerHTML = ''; // Clear existing invites
+    const invitesHtml = Object.entries(invites).map(([uuid, invite]) => {
+        return `<div class="invite">
+                <h2>From: ${invite.from.split('@')[0]}</h2>
+                <p>Book name: ${invite.name}</p>
+                <button onclick="acceptInvite('${uuid}')">Accept Invite</button>
+            </div>`;
+    }).join('');
+    document.getElementById('invites-container').innerHTML = invitesHtml;
+}
+
+function acceptInvite(uuid) {
+    fetch(APP_POST_PATH, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            "AcceptInvite": uuid
+        }),
+    });
 }
 
 // Populate contact book selector
@@ -39,6 +68,10 @@ function populateContactBookSelector(books) {
 // Display only the selected book
 function displaySelectedBook() {
     const selectedBookId = document.getElementById('contactBookSelect').value;
+    // if selectedBookId is empty, select the first book
+    if (!selectedBookId) {
+        document.getElementById('contactBookSelect').value = document.getElementById('contactBookSelect').firstElementChild.value;
+    }
     document.querySelectorAll('.contact-book').forEach(book => {
         book.style.display = book.id === `book-${selectedBookId}` ? '' : 'none';
     });
@@ -56,8 +89,17 @@ function enableBookCreation() {
             body: JSON.stringify({
                 "NewBook": newBookName
             }),
+        }).then(response => {
+            if (response.ok) {
+                document.getElementById('createBookForm').reset(); // Clear the form after submission
+                // set the new book as the selected book, where selector value is uuid
+                // but we don't have uuid, so need to search for it (ewww)
+                let books = document.getElementById('contactBookSelect').children;
+                let newBookElement = Array.from(books).find(book => book.textContent === newBookName);
+                document.getElementById('contactBookSelect').value = newBookElement.value;
+                displaySelectedBook();
+            }
         });
-        document.getElementById('createBookForm').reset(); // Clear the form after submission
     });
 }
 
@@ -213,6 +255,11 @@ function enableDeleteContactBook(container, uuid) {
                 body: JSON.stringify({
                     "RemoveBook": uuid
                 }),
+            }).then(response => {
+                if (response.ok) {
+                    document.getElementById('contactBookSelect').value = document.getElementById('contactBookSelect').firstElementChild.value;
+                    displaySelectedBook();
+                }
             });
         });
     });
@@ -406,7 +453,7 @@ ws.onmessage = event => {
     console.log(data);
     updateContactsAndPeers(data);
     populateContactBookSelector(data.books);
-    populateInvites(data.invites);
+    populateInvites(data.pending_invites);
     displaySelectedBook();
 };
 

@@ -21,12 +21,12 @@ pub struct ContactBook {
 }
 
 impl ContactBook {
-    pub fn new(name: String, our: &Address) -> Self {
+    pub fn new(name: String, owner: &Address) -> Self {
         Self {
             name,
-            owner: our.clone(),
+            owner: owner.clone(),
             contacts: BTreeMap::new(),
-            peers: BTreeMap::from([(our.to_string(), PeerStatus::Owner)]),
+            peers: BTreeMap::from([(owner.to_string(), PeerStatus::Owner)]),
         }
     }
 

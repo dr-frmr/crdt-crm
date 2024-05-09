@@ -151,13 +151,14 @@ fn handle_local_request(
 
             state.add_book(book_id, AutoCommit::load(&invite.data)?);
 
-            Request::to(invite.from)
+            Request::to(&invite.from)
                 .body(serde_json::to_vec(
                     &RemoteContactsRequest::InviteResponse {
                         book_id,
                         accepted: true,
                     },
                 )?)
+                .context(invite.from.to_string())
                 .expects_response(TIMEOUT)
                 .send()?;
         }
@@ -166,13 +167,14 @@ fn handle_local_request(
                 return Err(anyhow::anyhow!("invite not found"));
             };
 
-            Request::to(invite.from)
+            Request::to(&invite.from)
                 .body(serde_json::to_vec(
                     &RemoteContactsRequest::InviteResponse {
                         book_id,
                         accepted: false,
                     },
                 )?)
+                .context(invite.from.to_string())
                 .expects_response(TIMEOUT)
                 .send()?;
         }

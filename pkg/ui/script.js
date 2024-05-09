@@ -23,9 +23,9 @@ function init() {
 
 // Populate invites
 function populateInvites(invites) {
-    // if invites is null, return
-    if (!invites) {
-        document.getElementById("invites-container").innerHTML = '';
+    // if invites is null or empty, return
+    if (!invites || Object.keys(invites).length === 0) {
+        document.getElementById('invites-container').innerHTML = '';
         return;
     }
     const invitesHtml = Object.entries(invites).map(([uuid, invite]) => {
@@ -143,33 +143,13 @@ function updateContactsAndPeers(data) {
         contactBookContent.id = `book-${uuid}`;
         contactBookContent.style.display = 'none';
         contactBookContent.innerHTML = `
-                <h1>${book.name}</h1>
+                <h1>Book: ${book.name}</h1>
                 <div id="contacts">
                 </div>
-
-                <h1>Add Contact</h1>
-                <form class="addContactForm">
-                    <label for="name-${uuid}">Name:</label>
-                    <input type="text" id="name-${uuid}" name="name" required>
-                    <br>
-                    <label for="desc-${uuid}">Description:</label>
-                    <input type="text" id="desc-${uuid}" name="desc">
-                    <br>
-                    <div id="customFieldsContainer-${uuid}"></div>
-                    <button type="button" class="addCustomFieldBtn">Add Custom Field</button>
-                    <br>
-                    <button type="submit">Add</button>
-                </form>
 
                 <h1>Peers</h1>
                 <div id="peers">
                 </div>
-                <form class="invitePeerForm">
-                    <label for="peer-${uuid}">Add a new peer:</label>
-                    <input type="text" id="peer-${uuid}" name="peer" required>
-                    <br>
-                    <button type="submit">Send Invite</button>
-                </form>
 
                 <br>
                 <br>
@@ -178,9 +158,6 @@ function updateContactsAndPeers(data) {
         document.getElementById("books").appendChild(contactBookContent);
 
         const container = document.querySelector(`#book-${uuid}`);
-
-        // Call function to enable addition of custom fields for each book
-        enableCustomFieldAddition(container, uuid);
 
         // Populate contacts for each book
         populateContacts(container, book, uuid);
@@ -208,33 +185,17 @@ function updateContactsAndPeers(data) {
     }
 }
 
-function enableCustomFieldAddition(container, uuid) {
-    container.querySelectorAll('.addCustomFieldBtn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const inner = container.querySelector(`#customFieldsContainer-${uuid}`);
-            const inputGroup = document.createElement('div');
-            inputGroup.innerHTML = `
-                <input type="text" placeholder="Field Name" name="customFieldName[]" required>
-                <input type="text" placeholder="Field Value" name="customFieldValue[]" required>
-                <button type="button" class="removeFieldBtn">X</button>
-            `;
-            inner.appendChild(inputGroup);
-
-            inputGroup.querySelector('.removeFieldBtn').addEventListener('click', function () {
-                inputGroup.remove();
-            });
-        });
-    });
-}
-
 function populateContacts(container, book, uuid) {
     const contactsHtml = Object.entries(book.contacts).map(([id, contact]) => {
         return `<div class="contact">
                 <h2>${id}</h2>
                 <p class="editableDescription" contenteditable="false" data-contact-id="${id}">${contact.description || '(no description, click to add)'}</p>
                 <div class="socials">${Object.entries(contact.socials).map(([key, value]) => `
-                    <span class="editableSocial" contenteditable="false" data-contact-id="${id}" data-social-key="${key}">${key}: ${value}</span>
-                    <button type="button" class="removeSocialBtn" data-contact-id="${id}" data-social-key="${key}">Remove</button>
+                    <span class="socialEntry">
+                        <span>${key}:</span>
+                        <span class="editableSocialValue" contenteditable="true" data-contact-id="${id}" data-social-key="${key}">${value}</span>
+                        <button type="button" class="removeSocialBtn" data-contact-id="${id}" data-social-key="${key}">Remove</button>
+                    </span>
                 `).join('<br>')}</div>
                 <div class="addSocialForm" data-contact-id="${id}">
                     <input type="text" placeholder="Social Media Name" class="socialKeyInput">
@@ -244,7 +205,20 @@ function populateContacts(container, book, uuid) {
                 <button type="button" class="deleteContactBtn" data-contact-id="${id}">Delete</button>
             </div>`;
     }).join('');
-    container.querySelector('#contacts').innerHTML = contactsHtml;
+    container.querySelector('#contacts').innerHTML =
+        contactsHtml +
+        `<div class="contact">
+            <h1>Add Contact</h1>
+            <form class="addContactForm">
+                <label for="name-${uuid}">Name:</label>
+                <input type="text" id="name-${uuid}" name="name" required>
+                <br>
+                <label for="desc-${uuid}">Description:</label>
+                <input type="text" id="desc-${uuid}" name="desc">
+                <br>
+                <button type="submit">Add</button>
+            </form>
+        </div>`;
 }
 
 function populatePeers(container, book, uuid) {
@@ -254,7 +228,14 @@ function populatePeers(container, book, uuid) {
                 <p>Status: ${status}</p>
             </div>`;
     }).join('');
-    container.querySelector('#peers').innerHTML = peersHtml;
+    container.querySelector('#peers').innerHTML =
+        peersHtml +
+        `<form class="peer invitePeerForm">
+            <label for="peer-${uuid}">Add a new peer:</label>
+            <input type="text" id="peer-${uuid}" name="peer" required>
+            <br>
+            <button type="submit">Send Invite</button>
+        </form>`;
 }
 
 function enableDeleteContact(container, uuid) {
@@ -403,7 +384,7 @@ function enableEditDescription(container, uuid) {
 }
 
 function enableEditSocials(container, uuid) {
-    container.querySelectorAll('.editableSocial').forEach(social => {
+    container.querySelectorAll('.editableSocialValue').forEach(social => {
         social.addEventListener('click', function () {
             this.contentEditable = true;
             this.focus();
@@ -412,9 +393,9 @@ function enableEditSocials(container, uuid) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.contentEditable = false;
-                const newSocialValue = this.innerText.split(': ')[1];
                 const contactId = this.getAttribute('data-contact-id');
                 const socialKey = this.getAttribute('data-social-key');
+                const newSocialValue = this.innerText;
                 fetch(APP_POST_PATH, {
                     method: 'POST',
                     headers: {

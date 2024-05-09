@@ -1,7 +1,6 @@
 html,
 body {
     background-color: #E8F0FE;
-    /* Light blue background */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
@@ -10,117 +9,90 @@ body {
 
 main {
     max-width: 960px;
-    /* Slightly wider main area */
     margin: 40px auto;
-    /* More vertical margin for breathing room */
     padding: 40px;
-    /* More padding for a spacious look */
     background-color: #FAFAFA;
-    /* Off-white background for contrast */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    /* Slightly deeper shadow for depth */
     border-radius: 10px;
-    /* Rounded corners for a softer look */
+    display: flex;
+    flex-flow: column wrap;
+    justify-content: space-evenly;
 }
 
 h1,
 h2 {
     font-weight: 600;
-    /* Slightly bolder headers */
 }
 
 h1 {
     color: #4A90E2;
-    /* Darker blue for headers */
-    font-size: 2em;
-    /* Larger main headers */
+    font-size: 1.5em;
     margin-bottom: 20px;
-    /* More space below main headers */
 }
 
 h2 {
     color: #50B4FC;
-    /* Lighter blue for sub-headers */
-    font-size: 1.5em;
-    /* Larger sub-headers */
-    margin-bottom: 15px;
-    /* More space below sub-headers */
+    font-size: 1.2em;
+    margin-bottom: 20px;
+}
+
+#contacts,
+#peers {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
 }
 
 .contact,
 .peer {
-    background-color: #FAFAFA;
     border: 2px solid #B3DAF1;
-    /* Slightly thicker light blue border */
-    padding: 15px;
-    /* More padding for a roomier feel */
-    margin: 10px 0;
-    /* More vertical margin, removed horizontal margin */
-    border-radius: 10px;
-    /* Rounded corners for a softer look */
     transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
-    display: block;
-    /* Make these elements block for better structure */
-    width: auto;
-    /* Auto width for full-width blocks */
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
+    background-color: #EFEFEF;
+    padding: 10px 20px;
+    border-radius: 5px;
+    margin: 10px;
 }
 
 .contact:hover,
 .peer:hover {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    /* Deeper shadow on hover */
-    transform: translateY(-3px);
-    /* Less vertical movement on hover for subtlety */
+    transform: translateY(-5px);
 }
 
 .socials span {
     display: inline-block;
     margin-right: 10px;
-    /* More space between social icons */
     font-size: 1em;
-    /* Larger font size for better readability */
     color: #7A92A5;
-    /* Soft grey for social info */
 }
 
 form {
     background-color: #F4F9FD;
-    /* Very light blue for form background */
     padding: 20px;
-    /* More padding for a roomier form */
     border-radius: 10px;
-    /* Rounded corners for a softer look */
     margin-bottom: 20px;
-    /* More space below forms */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-    /* Slightly deeper shadow for depth */
+    display: flex;
+    flex-direction: column;
 }
 
 form label {
     display: block;
-    /* Block display for labels for better structure */
     margin-bottom: 5px;
-    /* Space below labels */
     font-size: 1em;
-    /* Larger font size for better readability */
     color: #4A90E2;
-    /* Darker blue for form labels */
 }
 
 form input,
 form button[type="submit"],
 form button[type="button"] {
-    padding: 10px;
-    /* More padding for larger, easier-to-click elements */
-    margin-bottom: 15px;
-    /* More space between form elements */
+    padding: 12px;
     border: 2px solid #B3DAF1;
-    /* Slightly thicker light blue border */
     border-radius: 5px;
-    /* Rounded corners for a softer look */
     width: calc(100% - 24px);
-    /* Adjust width calculation for thicker borders */
     box-sizing: border-box;
     transition: background-color 0.3s, border-color 0.3s;
 }
@@ -129,55 +101,163 @@ form input:focus,
 form button[type="submit"]:focus,
 form button[type="button"]:focus {
     border-color: #4A90E2;
-    /* Darker blue for focus */
     outline: none;
 }
 
 form button[type="submit"],
 form button[type="button"] {
     background-color: #007bff;
-    /* Bright blue for buttons */
     color: white;
     cursor: pointer;
     font-size: 1em;
-    /* Larger font size for better readability */
     transition: background-color 0.3s;
 }
 
 form button[type="submit"]:hover,
 form button[type="button"]:hover {
     background-color: #0056b3;
-    /* Darker blue on hover */
 }
 
 #clearStateForm button,
 .removeFieldBtn {
     background-color: #D9534F;
-    /* Red for clear state and remove field buttons */
     color: white;
     border: none;
     border-radius: 5px;
-    /* Rounded corners for a softer look */
     cursor: pointer;
-    padding: 10px 15px;
-    /* More padding for a larger, easier-to-click button */
+    padding: 12px 18px;
 }
 
 #addCustomFieldBtn,
 .removeFieldBtn:hover {
     background-color: #5CB85C;
-    /* Green for add field button, darker red on hover for remove button */
     color: white;
-    margin-bottom: 15px;
-    /* More space below the add field button */
 }
 
 form input {
     background-color: #FAFAFA;
-    /* Off-white background for inputs */
 }
 
 form input:hover {
     background-color: #F4F9FD;
-    /* Very light blue on hover */
+}
+
+#contact-book-select {
+    color: #4A90E2;
+    background-color: #FAFAFA;
+    padding: 12px;
+    border: 2px solid #B3DAF1;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+#contact-book-select-label {
+    display: inline-block;
+    font-size: 1em;
+}
+
+#contact-book-select {
+    display: inline-block;
+    cursor: pointer;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+#contact-book-select:hover {
+    background-color: #F4F9FD;
+    border-color: #4A90E2;
+}
+
+.deleteContactBookBtn {
+    background-color: #D9534F;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 12px 24px;
+    transition: background-color 0.3s;
+    display: block;
+    margin-left: auto;
+    margin-right: 0;
+}
+
+.deleteContactBookBtn:hover {
+    background-color: #C9302C;
+}
+
+.addContactForm,
+.invitePeerForm,
+.invite {
+    background-color: #FFFFFF;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.addContactForm label,
+.invitePeerForm label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.addContactForm input[type="text"],
+.invitePeerForm input[type="text"],
+#newBookName {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    display: inline-block;
+    width: calc(100% - 22px);
+}
+
+.addContactForm button,
+.invitePeerForm button,
+.invite button {
+    background-color: #4A90E2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.addContactForm button:hover,
+.invitePeerForm button:hover,
+.invite button:hover {
+    background-color: #357ABD;
+}
+
+.removeFieldBtn,
+.deleteContactBtn,
+.submitSocialBtn,
+.socials button {
+    background-color: #4A90E2;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-top: 5px;
+    max-width: 100px;
+}
+
+.removeFieldBtn:hover,
+.deleteContactBtn:hover,
+.submitSocialBtn:hover {
+    background-color: #357ABD;
+}
+
+.editableDescription,
+.editableSocial {
+    border: 1px solid transparent;
+    padding: 5px;
+    display: inline-block;
+    width: calc(100% - 10px);
+}
+
+.editableDescription:focus,
+.editableSocial:focus {
+    border: 1px solid #4A90E2;
+    outline: none;
 }

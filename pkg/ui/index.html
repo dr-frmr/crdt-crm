@@ -11,22 +11,24 @@
 </head>
 
 <body>
+    <div id="our" style="display: none;"></div>
     <main>
-        <h1>Invites</h1>
+
         <div id="invites-container">
             <!-- Invites will be populated dynamically -->
         </div>
 
-        <div class="contact-book-selector">
-            <label for="contactBookSelect">Choose a Contact Book:</label>
-            <select id="contactBookSelect">
+        <div id="contact-book-selector">
+            <label id="contact-book-select-label" for="contact-book-select">Choose a Contact Book:</label>
+            <select style="display: none;" id="contact-book-select">
                 <!-- Options will be populated dynamically -->
             </select>
-            <form id="createBookForm">
-                <input type="text" id="newBookName" name="newBookName" placeholder="New Book Name">
-                <button type="submit">Create New Book</button>
-            </form>
         </div>
+
+        <form id="createBookForm">
+            <input type="text" id="newBookName" name="newBookName" placeholder="New Book Name">
+            <button type="submit">Create New Book</button>
+        </form>
 
         <div id="books">
             <!-- Contact books will be populated dynamically -->

@@ -6,16 +6,18 @@ function init() {
         .then(response => response.text())
         .then(data => {
             const our = data + '@contacts:crdt-crm:mothu.eth';
-            fetch(`/contacts:crdt-crm:mothu.eth/state`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log(data);
-                    updateContactsAndPeers(data);
-                    populateContactBookSelector(data.books);
-                    populateInvites(data.pending_invites);
-                    enableBookCreation();
-                    displaySelectedBook();
-                });
+            document.getElementById('our').innerText = our;
+        });
+
+    fetch(`/contacts:crdt-crm:mothu.eth/state`)
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+            updateContactsAndPeers(data);
+            populateContactBookSelector(data.books);
+            populateInvites(data.pending_invites);
+            enableBookCreation();
+            displaySelectedBook();
         });
 }
 
@@ -23,20 +25,20 @@ function init() {
 function populateInvites(invites) {
     // if invites is null, return
     if (!invites) {
+        document.getElementById("invites-container").innerHTML = '';
         return;
     }
-    document.getElementById("invites-container").innerHTML = ''; // Clear existing invites
     const invitesHtml = Object.entries(invites).map(([uuid, invite]) => {
-        return `<div class="invite">
+        return `<form class="invite" onsubmit="acceptInvite('${uuid}', '${invite.from}', '${invite.name}'); return false;">
                 <h2>From: ${invite.from.split('@')[0]}</h2>
                 <p>Book name: ${invite.name}</p>
-                <button onclick="acceptInvite('${uuid}')">Accept Invite</button>
-            </div>`;
+                <button type="submit">Accept Invite</button>
+            </form>`;
     }).join('');
-    document.getElementById('invites-container').innerHTML = invitesHtml;
+    document.getElementById('invites-container').innerHTML = '<h1>Invites</h1>' + invitesHtml;
 }
 
-function acceptInvite(uuid) {
+function acceptInvite(uuid, from, name) {
     fetch(APP_POST_PATH, {
         method: 'POST',
         headers: {
@@ -45,16 +47,36 @@ function acceptInvite(uuid) {
         body: JSON.stringify({
             "AcceptInvite": uuid
         }),
+    }).then(response => {
+        if (response.ok) {
+            // set the new book as the selected book using the 'from' and 'name' values
+            let books = document.getElementById('contact-book-select').children;
+            let newBookElement = Array.from(books).find(
+                book => book.textContent === bookFullName(name, from)
+            );
+            if (newBookElement) {
+                document.getElementById('contact-book-select').value = newBookElement.value;
+                displaySelectedBook();
+            } else {
+                console.error('Newly accepted book not found in selector.');
+            }
+        }
     });
 }
 
+function bookFullName(name, owner) {
+    return name + ' (' + owner.split('@')[0] + ')';
+}
+
 // Populate contact book selector
+// If the selector is empty, instead of populating it, hide it and
+// prompt the user to create a new book
 function populateContactBookSelector(books) {
-    const selector = document.getElementById('contactBookSelect');
-    const currentBookId = document.getElementById('contactBookSelect').value;
+    const selector = document.getElementById('contact-book-select');
+    const currentBookId = document.getElementById('contact-book-select').value;
     selector.innerHTML = ''; // Clear existing options
     for (const [uuid, book] of Object.entries(books)) {
-        const option = new Option(book.name, uuid);
+        const option = new Option(bookFullName(book.name, book.owner), uuid);
         selector.add(option);
     }
     if (currentBookId) {
@@ -63,15 +85,18 @@ function populateContactBookSelector(books) {
     selector.addEventListener('change', function () {
         displaySelectedBook();
     });
+    if (selector.children.length === 0) {
+        document.getElementById('contact-book-select-label').innerText = 'No Contact Books yet, create one below.';
+        document.getElementById('contact-book-select').style.display = 'none';
+    } else {
+        document.getElementById('contact-book-select-label').innerText = 'Choose a Contact Book:';
+        document.getElementById('contact-book-select').style.display = '';
+    }
 }
 
 // Display only the selected book
 function displaySelectedBook() {
-    const selectedBookId = document.getElementById('contactBookSelect').value;
-    // if selectedBookId is empty, select the first book
-    if (!selectedBookId) {
-        document.getElementById('contactBookSelect').value = document.getElementById('contactBookSelect').firstElementChild.value;
-    }
+    const selectedBookId = document.getElementById('contact-book-select').value;
     document.querySelectorAll('.contact-book').forEach(book => {
         book.style.display = book.id === `book-${selectedBookId}` ? '' : 'none';
     });
@@ -94,10 +119,17 @@ function enableBookCreation() {
                 document.getElementById('createBookForm').reset(); // Clear the form after submission
                 // set the new book as the selected book, where selector value is uuid
                 // but we don't have uuid, so need to search for it (ewww)
-                let books = document.getElementById('contactBookSelect').children;
-                let newBookElement = Array.from(books).find(book => book.textContent === newBookName);
-                document.getElementById('contactBookSelect').value = newBookElement.value;
-                displaySelectedBook();
+                let books = document.getElementById('contact-book-select').children;
+                let newBookElement = Array.from(books).find(
+                    book => book.textContent ===
+                        bookFullName(newBookName, document.getElementById('our').innerText)
+                );
+                if (newBookElement) {
+                    document.getElementById('contact-book-select').value = newBookElement.value;
+                    displaySelectedBook();
+                } else {
+                    console.error('Newly accepted book not found in selector.');
+                }
             }
         });
     });
@@ -257,7 +289,7 @@ function enableDeleteContactBook(container, uuid) {
                 }),
             }).then(response => {
                 if (response.ok) {
-                    document.getElementById('contactBookSelect').value = document.getElementById('contactBookSelect').firstElementChild.value;
+                    document.getElementById('contact-book-select').value = document.getElementById('contact-book-select').firstElementChild.value;
                     displaySelectedBook();
                 }
             });

@@ -5,10 +5,14 @@
         "on_exit": "Restart",
         "request_networking": true,
         "request_capabilities": [
+            "homepage:homepage:sys",
             "http_server:distro:sys",
             "vfs:distro:sys"
         ],
-        "grant_capabilities": [],
+        "grant_capabilities": [
+            "http_server:distro:sys",
+            "timer:distro:sys"
+        ],
         "public": false
     }
 ]

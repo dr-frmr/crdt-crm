@@ -11,6 +11,9 @@ pub fn serve(our: &Address) {
     http::bind_http_path("/state", true, false).expect("couldn't bind HTTP state path");
     http::bind_http_path("/post", true, false).expect("couldn't bind HTTP post path");
     http::bind_ws_path("/updates", true, false).expect("couldn't bind WS updates path");
+
+    // add icon to homepage
+    kinode_process_lib::homepage::add_to_homepage("Contacts", None, Some("/"), None);
 }
 
 pub fn send_ws_updates(state: &State, ws_channels: &HashSet<u32>) {

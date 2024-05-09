@@ -5,7 +5,7 @@
     "properties": {
         "package_name": "crdt-crm",
         "current_version": "0.2.0",
-        "publisher": "mothu-et-doria.os",
+        "publisher": "mothu.eth",
         "mirrors": [],
         "code_hashes": {
             "0.1.0": ""

@@ -1,7 +1,14 @@
-use crate::types::{Contact, PeerStatus};
+use crate::contact_book::{Contact, PeerStatus};
 use kinode_process_lib::Address;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Request {
+    Local(LocalContactsRequest),
+    Remote(RemoteContactsRequest),
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LocalContactsRequest {
@@ -28,7 +35,7 @@ pub enum Update {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ContactsRequest {
+pub enum RemoteContactsRequest {
     /// Sync between remote peers. In the future, should add options
     /// to sync without sending all data.
     Sync {
@@ -45,13 +52,4 @@ pub enum ContactsRequest {
         book_id: Uuid,
         accepted: bool,
     },
-}
-
-pub type ContactsResponse = Result<(), ContactsError>;
-
-#[derive(Serialize, Deserialize)]
-pub enum ContactsError {
-    UnknownPeer,
-    ReadOnlyPeer,
-    BadSync,
 }

@@ -1,12 +1,16 @@
 use crate::{LocalContactsRequest, State};
-use kinode_process_lib::{http::*, Address, Message};
+use kinode_process_lib::{
+    http,
+    http::{HttpServerRequest, IncomingHttpRequest, Method, StatusCode},
+    Address, Message,
+};
 use std::collections::HashSet;
 
 pub fn serve(our: &Address) {
-    serve_ui(our, "ui", true, false, vec!["/"]).expect("couldn't serve UI");
-    bind_http_path("/state", true, false).expect("couldn't bind HTTP state path");
-    bind_http_path("/post", true, false).expect("couldn't bind HTTP post path");
-    bind_ws_path("/updates", true, false).expect("couldn't bind WS updates path");
+    http::serve_ui(our, "ui", true, false, vec!["/"]).expect("couldn't serve UI");
+    http::bind_http_path("/state", true, false).expect("couldn't bind HTTP state path");
+    http::bind_http_path("/post", true, false).expect("couldn't bind HTTP post path");
+    http::bind_ws_path("/updates", true, false).expect("couldn't bind WS updates path");
 }
 
 pub fn send_ws_updates(state: &State, ws_channels: &HashSet<u32>) {
@@ -21,9 +25,9 @@ pub fn send_ws_updates(state: &State, ws_channels: &HashSet<u32>) {
     .as_bytes()
     .to_vec();
     for channel_id in ws_channels.iter() {
-        send_ws_push(
+        http::send_ws_push(
             *channel_id,
-            WsMessageType::Text,
+            http::WsMessageType::Text,
             kinode_process_lib::LazyLoadBlob {
                 mime: Some("application/json".to_string()),
                 bytes: bytes.clone(),
@@ -47,7 +51,7 @@ pub fn handle_http_request(
 
     match req {
         HttpServerRequest::Http(req) => match serve_http_paths(our, req, state, ws_channels) {
-            Ok((status_code, body)) => send_response(
+            Ok((status_code, body)) => http::send_response(
                 status_code,
                 Some(std::collections::HashMap::from([(
                     String::from("Content-Type"),
@@ -56,7 +60,7 @@ pub fn handle_http_request(
                 body,
             ),
             Err(e) => {
-                send_response(StatusCode::INTERNAL_SERVER_ERROR, None, vec![]);
+                http::send_response(StatusCode::INTERNAL_SERVER_ERROR, None, vec![]);
                 return Err(e);
             }
         },
@@ -110,7 +114,9 @@ pub fn serve_http_paths(
                 .ok_or(anyhow::anyhow!("http POST without body"))?
                 .bytes;
             let request: LocalContactsRequest = serde_json::from_slice(&json_bytes)?;
-            crate::handle_local_message(&our, request, state, ws_channels)?;
+            crate::handle_local_request(&our, request, state)?;
+            send_ws_updates(state, ws_channels);
+            state.persist();
             Ok((StatusCode::OK, vec![]))
         }
         _ => Ok((StatusCode::NOT_FOUND, vec![])),

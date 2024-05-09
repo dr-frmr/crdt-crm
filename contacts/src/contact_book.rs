@@ -1,4 +1,4 @@
-use crate::api::Update;
+use crate::request::Update;
 use autosurgeon::{Hydrate, Reconcile};
 use kinode_process_lib::Address;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,20 @@ pub struct ContactBook {
     /// The peers that have a copy of the address book and can make changes.
     /// keys are addresses.to_string()
     pub peers: BTreeMap<String, PeerStatus>,
+}
+
+#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize, PartialEq)]
+pub enum PeerStatus {
+    #[default]
+    ReadOnly,
+    ReadWrite,
+    Owner,
+}
+
+#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
+pub struct Contact {
+    pub description: Option<String>,
+    pub socials: BTreeMap<String, String>,
 }
 
 impl ContactBook {
@@ -69,20 +83,6 @@ impl ContactBook {
         }
         Ok(())
     }
-}
-
-#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize, PartialEq)]
-pub enum PeerStatus {
-    #[default]
-    ReadOnly,
-    ReadWrite,
-    Owner,
-}
-
-#[derive(Debug, Default, Clone, Reconcile, Hydrate, Serialize, Deserialize)]
-pub struct Contact {
-    pub description: Option<String>,
-    pub socials: BTreeMap<String, String>,
 }
 
 mod autosurgeon_address {

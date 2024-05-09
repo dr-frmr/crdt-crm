@@ -1,8 +1,9 @@
 #![feature(let_chains)]
 use crate::{
-    api::*,
+    contact_book::{Contact, ContactBook, PeerStatus},
+    request::{LocalContactsRequest, RemoteContactsRequest, Update},
+    response::{ContactsError, ContactsResponse},
     state::{Invite, State},
-    types::*,
 };
 use automerge::AutoCommit;
 use autosurgeon::{hydrate, reconcile};
@@ -10,31 +11,29 @@ use kinode_process_lib::{await_message, println, Address, Message, Request, Resp
 use std::collections::HashSet;
 use uuid::Uuid;
 
-mod api;
+mod contact_book;
 mod frontend;
+mod request;
+mod response;
 mod state;
-mod types;
 
 wit_bindgen::generate!({
     path: "wit",
     world: "process",
-    exports: {
-        world: Component,
-    },
 });
+
+const TIMEOUT: u64 = 30;
 
 kinode_process_lib::call_init!(init);
 fn init(our: Address) {
-    println!("start");
-
     let mut state = if let Some(state) = kinode_process_lib::get_state()
         && let Ok(state) = serde_json::from_slice::<State>(&state)
     {
+        println!("loading saved state");
         state
     } else {
         println!("generating new state");
         let state = State::new(&our);
-        kinode_process_lib::set_state(&serde_json::to_vec(&state).unwrap());
         state
     };
 
@@ -44,12 +43,9 @@ fn init(our: Address) {
     kinode_process_lib::timer::set_timer(30_000, None);
 
     loop {
-        match handle_message(&our, &mut state, &mut ws_channels) {
-            Ok(()) => {}
-            Err(e) => {
-                println!("error: {:?}", e);
-            }
-        };
+        handle_message(&our, &mut state, &mut ws_channels)
+            .map_err(|e| println!("error: {:?}", e))
+            .ok();
     }
 }
 
@@ -60,38 +56,45 @@ fn handle_message(
 ) -> anyhow::Result<()> {
     match await_message() {
         Ok(message) => {
-            if message.source().node() == our.node() {
-                if message.source().process == "timer:distro:sys" {
+            if message.is_local(our) {
+                if message.is_process("timer:distro:sys") {
                     // every 30 seconds, try re-sending failed messages
                     // should really do some exponential backoff here
-                    kinode_process_lib::timer::set_timer(30_000, None);
                     state.retry_all_failed_messages()?;
+                    kinode_process_lib::timer::set_timer(30_000, None);
                     Ok(())
-                } else if message.source().process == "http_server:distro:sys" {
+                } else if message.is_process("http_server:distro:sys") {
                     // handle http requests
                     frontend::handle_http_request(our, message, state, ws_channels)
                 } else {
-                    if !message.is_request() {
-                        return Ok(());
+                    // no need to handle any other responses
+                    if message.is_request() {
+                        handle_local_request(our, serde_json::from_slice(message.body())?, state)?;
+                        frontend::send_ws_updates(&state, ws_channels);
+                        state.persist();
+                        Ok(())
+                    } else {
+                        Ok(())
                     }
-                    return handle_local_message(
-                        our,
-                        serde_json::from_slice(message.body())?,
-                        state,
-                        ws_channels,
-                    );
                 }
             } else {
-                if !message.is_request() {
-                    return Ok(());
+                // no need to handle remote responses: fact that we've received them is enough
+                if message.is_request() {
+                    handle_remote_message(our, message, state)?;
+                    frontend::send_ws_updates(&state, ws_channels);
+                    state.persist();
+                    Ok(())
+                } else {
+                    Ok(())
                 }
-                return handle_remote_message(our, message, state, ws_channels);
             }
         }
         Err(send_error) => {
-            // if a message fails to send, keep trying it! this is an example,
-            // but you need to find a way to try and stay syned here.
+            // if a message fails to send, keep trying it! this is just a simple example,
+            // but you need to find a way to try and stay synced here or otherwise achieve
+            // eventual consistency
             if send_error.message.is_request() {
+                // TODO replace this in next wit update with just error.target
                 let Some(context) = send_error.context() else {
                     return Ok(());
                 };
@@ -103,11 +106,10 @@ fn handle_message(
     }
 }
 
-fn handle_local_message(
+fn handle_local_request(
     our: &Address,
     request: LocalContactsRequest,
     state: &mut State,
-    ws_channels: &mut HashSet<u32>,
 ) -> anyhow::Result<()> {
     match request {
         LocalContactsRequest::Update(book_id, update) => {
@@ -132,14 +134,14 @@ fn handle_local_message(
             let data = crdt.save();
             state.add_outgoing_invite(book_id, address.clone(), status.clone());
             Request::to(&address)
-                .body(serde_json::to_vec(&ContactsRequest::Invite {
+                .body(serde_json::to_vec(&RemoteContactsRequest::Invite {
                     book_id,
                     name: contact_book.name,
                     status,
                     data,
                 })?)
                 .context(address.to_string())
-                .expects_response(30)
+                .expects_response(TIMEOUT)
                 .send()?;
         }
         LocalContactsRequest::AcceptInvite(book_id) => {
@@ -150,11 +152,13 @@ fn handle_local_message(
             state.add_book(book_id, AutoCommit::load(&invite.data)?);
 
             Request::to(invite.from)
-                .body(serde_json::to_vec(&ContactsRequest::InviteResponse {
-                    book_id,
-                    accepted: true,
-                })?)
-                .expects_response(30)
+                .body(serde_json::to_vec(
+                    &RemoteContactsRequest::InviteResponse {
+                        book_id,
+                        accepted: true,
+                    },
+                )?)
+                .expects_response(TIMEOUT)
                 .send()?;
         }
         LocalContactsRequest::RejectInvite(book_id) => {
@@ -163,16 +167,16 @@ fn handle_local_message(
             };
 
             Request::to(invite.from)
-                .body(serde_json::to_vec(&ContactsRequest::InviteResponse {
-                    book_id,
-                    accepted: false,
-                })?)
-                .expects_response(30)
+                .body(serde_json::to_vec(
+                    &RemoteContactsRequest::InviteResponse {
+                        book_id,
+                        accepted: false,
+                    },
+                )?)
+                .expects_response(TIMEOUT)
                 .send()?;
         }
     }
-    frontend::send_ws_updates(&state, ws_channels);
-    kinode_process_lib::set_state(&serde_json::to_vec(&state)?);
     Ok(())
 }
 
@@ -193,15 +197,17 @@ fn handle_update(
 
     let mut contact_book: ContactBook = hydrate(crdt)?;
     contact_book.apply_update(update)?;
+
     // if we just removed ourself, as the owner, set a new owner
     // so that the book is not stuck
     if removed == Some(our.clone()) && contact_book.peers.len() > 0 {
         let new_owner = contact_book.peers.keys().next().unwrap().clone();
         contact_book.owner = new_owner.parse()?;
     }
+
     reconcile(crdt, &contact_book).unwrap();
 
-    let sync_request = serde_json::to_vec(&ContactsRequest::Sync {
+    let sync_request = serde_json::to_vec(&RemoteContactsRequest::Sync {
         book_id,
         data: crdt.save(),
     })?;
@@ -213,7 +219,7 @@ fn handle_update(
             Request::to(peer_addr)
                 .body(sync_request.clone())
                 .context(peer.to_string())
-                .expects_response(30)
+                .expects_response(TIMEOUT)
                 .send()?;
         }
     }
@@ -225,30 +231,25 @@ fn handle_update(
         Request::to(&address)
             .body(sync_request)
             .context(address.to_string())
-            .expects_response(30)
+            .expects_response(TIMEOUT)
             .send()?;
     }
     Ok(())
 }
 
-fn handle_remote_message(
-    our: &Address,
-    message: Message,
-    state: &mut State,
-    ws_channels: &mut HashSet<u32>,
-) -> anyhow::Result<()> {
-    match serde_json::from_slice::<ContactsRequest>(message.body())? {
-        ContactsRequest::Sync { book_id, data } => {
+fn handle_remote_message(our: &Address, message: Message, state: &mut State) -> anyhow::Result<()> {
+    match serde_json::from_slice::<RemoteContactsRequest>(message.body())? {
+        RemoteContactsRequest::Sync { book_id, data } => {
             let Some(crdt) = state.get_book_mut(&book_id) else {
-                return respond(ContactsResponse::Err(ContactsError::BadSync));
+                return respond_with_err(ContactsError::BadSync);
             };
             let contact_book: ContactBook = hydrate(crdt)?;
 
             let Some(status) = contact_book.peers.get(&message.source().to_string()) else {
-                return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
+                return respond_with_err(ContactsError::UnknownPeer);
             };
             if *status == PeerStatus::ReadOnly {
-                return respond(ContactsResponse::Err(ContactsError::ReadOnlyPeer));
+                return respond_with_err(ContactsError::ReadOnlyPeer);
             };
 
             let mut their_fork =
@@ -257,7 +258,7 @@ fn handle_remote_message(
             println!("merging update from {}", message.source().node());
             crdt.merge(&mut their_fork)?;
         }
-        ContactsRequest::Invite {
+        RemoteContactsRequest::Invite {
             book_id,
             name,
             status,
@@ -271,12 +272,12 @@ fn handle_remote_message(
             };
             state.add_invite(book_id, invite);
         }
-        ContactsRequest::InviteResponse { book_id, accepted } => {
+        RemoteContactsRequest::InviteResponse { book_id, accepted } => {
             let Some((address, status)) = state.get_outgoing_invite(&book_id) else {
-                return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
+                return respond_with_err(ContactsError::UnknownPeer);
             };
             if address != message.source() {
-                return respond(ContactsResponse::Err(ContactsError::UnknownPeer));
+                return respond_with_err(ContactsError::UnknownPeer);
             }
             let update = Update::AddPeer(message.source().to_owned(), status.to_owned());
             state.remove_outgoing_invite(&book_id);
@@ -286,14 +287,13 @@ fn handle_remote_message(
             }
         }
     }
-    respond(Ok(()))?;
-    frontend::send_ws_updates(&state, ws_channels);
-    kinode_process_lib::set_state(&serde_json::to_vec(&state)?);
-    Ok(())
+    Response::new()
+        .body(serde_json::to_vec(&ContactsResponse::Ok(()))?)
+        .send()
 }
 
-fn respond(response: ContactsResponse) -> anyhow::Result<()> {
+fn respond_with_err(err: ContactsError) -> anyhow::Result<()> {
     Response::new()
-        .body(serde_json::to_vec(&response).unwrap())
+        .body(serde_json::to_vec(&ContactsResponse::Err(err))?)
         .send()
 }

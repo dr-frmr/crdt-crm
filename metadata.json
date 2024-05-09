@@ -1,11 +1,11 @@
 {
-    "name": "crdt-crm",
-    "description": "",
+    "name": "CRDT Contacts",
+    "description": "A simple contracts management app that uses CRDTs",
     "image": "",
     "properties": {
         "package_name": "crdt-crm",
-        "current_version": "0.1.0",
-        "publisher": "mothu.eth",
+        "current_version": "0.2.0",
+        "publisher": "mothu-et-doria.os",
         "mirrors": [],
         "code_hashes": {
             "0.1.0": ""

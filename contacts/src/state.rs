@@ -1,17 +1,9 @@
-use crate::{Contact, ContactBook, PeerStatus, Update};
+use crate::{request::Update, Contact, ContactBook, PeerStatus};
 use automerge::AutoCommit;
 use kinode_process_lib::{Address, Message, Request};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use uuid::Uuid;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Invite {
-    pub from: Address,
-    pub name: String,
-    pub status: PeerStatus,
-    pub data: Vec<u8>,
-}
 
 #[derive(Debug, Default)]
 pub struct State {
@@ -24,6 +16,14 @@ pub struct State {
     /// Book-syncing messages that failed to send. We retry these periodically until
     /// either they succeed or the peer is removed from the book.
     pub failed_messages: HashMap<Address, Message>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Invite {
+    pub from: Address,
+    pub name: String,
+    pub status: PeerStatus,
+    pub data: Vec<u8>,
 }
 
 impl State {
@@ -53,9 +53,6 @@ impl State {
     }
     pub fn remove_book(&mut self, book_id: &Uuid) {
         self.books.remove(book_id);
-    }
-    pub fn get_book(&self, book_id: &Uuid) -> Option<&AutoCommit> {
-        self.books.get(book_id)
     }
     pub fn get_book_mut(&mut self, book_id: &Uuid) -> Option<&mut AutoCommit> {
         self.books.get_mut(book_id)
@@ -90,10 +87,15 @@ impl State {
             Request::to(&target)
                 .body(failed_message.body())
                 .context(target.to_string())
-                .expects_response(30)
+                .expects_response(crate::TIMEOUT)
                 .send()?;
         }
         Ok(())
+    }
+    pub fn persist(&self) {
+        kinode_process_lib::set_state(
+            &serde_json::to_vec(self).expect("failed to serialize state!"),
+        );
     }
 }
 
@@ -102,7 +104,7 @@ impl Serialize for State {
     where
         S: serde::Serializer,
     {
-        let mut ser = serializer.serialize_struct("State", 4)?;
+        let mut ser = serializer.serialize_struct("State", 3)?;
         let books_as_bytes: HashMap<Uuid, Vec<u8>> = self
             .books
             .iter()
@@ -111,7 +113,6 @@ impl Serialize for State {
         ser.serialize_field("books", &books_as_bytes)?;
         ser.serialize_field("pending_invites", &self.pending_invites)?;
         ser.serialize_field("outgoing_invites", &self.outgoing_invites)?;
-        ser.serialize_field("failed_messages", &self.failed_messages)?;
         ser.end()
     }
 }
@@ -126,7 +127,6 @@ impl<'de> Deserialize<'de> for State {
             books: HashMap<Uuid, Vec<u8>>,
             pending_invites: HashMap<Uuid, Invite>,
             outgoing_invites: HashMap<Uuid, (Address, PeerStatus)>,
-            failed_messages: HashMap<Address, Message>,
         }
 
         let helper = StateHelper::deserialize(deserializer)?;
@@ -143,7 +143,7 @@ impl<'de> Deserialize<'de> for State {
             books,
             pending_invites: helper.pending_invites,
             outgoing_invites: helper.outgoing_invites,
-            failed_messages: helper.failed_messages,
+            failed_messages: HashMap::new(),
         })
     }
 }

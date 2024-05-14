@@ -8,7 +8,7 @@
         "publisher": "mothu-et-doria.os",
         "mirrors": [],
         "code_hashes": {
-            "0.2.0": "92ce12d13368ffbb3ba24981840d605d90f6608de06414862cbe3b710c7ac1da"
+            "0.2.0": "968fb8ff6ba7f0612043268e330622f6514c23f5d4c4a5a2121b29e016ce1572"
         }
     },
     "external_url": "https://github.com/dr-frmr/crdt-crm",

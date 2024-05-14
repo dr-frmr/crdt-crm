@@ -1,15 +1,15 @@
-const APP_POST_PATH = '/contacts:crdt-crm:mothu.eth/post';
+const APP_POST_PATH = '/contacts:crdt-crm:mothu-et-doria.os/post';
 
 // Fetch initial data and populate the UI
 function init() {
     fetch('/our')
         .then(response => response.text())
         .then(data => {
-            const our = data + '@contacts:crdt-crm:mothu.eth';
+            const our = data + '@contacts:crdt-crm:mothu-et-doria.os';
             document.getElementById('our').innerText = our;
         });
 
-    fetch(`/contacts:crdt-crm:mothu.eth/state`)
+    fetch(`/contacts:crdt-crm:mothu-et-doria.os/state`)
         .then(response => response.json())
         .then(data => {
             console.log(data);
@@ -331,8 +331,8 @@ function enableInvitePeer(container, uuid) {
                 data[key] = value;
             }
             let peer = formData.get('peer');
-            if (!peer.endsWith('@contacts:crdt-crm:mothu.eth')) {
-                peer = peer + '@contacts:crdt-crm:mothu.eth';
+            if (!peer.endsWith('@contacts:crdt-crm:mothu-et-doria.os')) {
+                peer = peer + '@contacts:crdt-crm:mothu-et-doria.os';
             }
             fetch(APP_POST_PATH, {
                 method: 'POST',
@@ -461,7 +461,7 @@ init();
 
 // Setup WebSocket connection
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-const ws = new WebSocket(wsProtocol + "//" + location.host + "/contacts:crdt-crm:mothu.eth/updates");
+const ws = new WebSocket(wsProtocol + "//" + location.host + "/contacts:crdt-crm:mothu-et-doria.os/updates");
 ws.onmessage = event => {
     const data = JSON.parse(event.data);
     console.log(data);

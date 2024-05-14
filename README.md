@@ -16,17 +16,17 @@ Sample usage (assuming two nodes named `fake1.os` and `fake2.os` have app instal
 
 On `fake1.os`:
 ```
-m our@contacts:crdt-crm:mothu.eth '{"AddPeer": ["fake2.os@contacts:crdt-crm:mothu.eth", "ReadWrite"]}'
+m our@contacts:crdt-crm:mothu-et-doria.os '{"AddPeer": ["fake2.os@contacts:crdt-crm:mothu-et-doria.os", "ReadWrite"]}'
 ```
 
 On `fake2.os`:
 ```
-m our@contacts:crdt-crm:mothu.eth '{"AddPeer": ["fake1.os@contacts:crdt-crm:mothu.eth", "ReadWrite"]}'
+m our@contacts:crdt-crm:mothu-et-doria.os '{"AddPeer": ["fake1.os@contacts:crdt-crm:mothu-et-doria.os", "ReadWrite"]}'
 ```
 
 Now, you can use the app on both nodes, and they will merge with one another.
 ```
-m our@contacts:crdt-crm:mothu.eth '{"AddContact": ["Doria", {"description": "hai", "socials": {}}]}'
-m our@contacts:crdt-crm:mothu.eth '{"RemoveContact": "Doria"}'
-m our@contacts:crdt-crm:mothu.eth '{"EditContactSocial": ["Doria", "Telegram", "t.me/doria"]}'
+m our@contacts:crdt-crm:mothu-et-doria.os '{"AddContact": ["Doria", {"description": "hai", "socials": {}}]}'
+m our@contacts:crdt-crm:mothu-et-doria.os '{"RemoveContact": "Doria"}'
+m our@contacts:crdt-crm:mothu-et-doria.os '{"EditContactSocial": ["Doria", "Telegram", "t.me/doria"]}'
 ```

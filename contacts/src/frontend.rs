@@ -6,6 +6,8 @@ use kinode_process_lib::{
 };
 use std::collections::HashSet;
 
+const ICON: &str = include_str!("icon");
+
 pub fn serve(our: &Address) {
     http::serve_ui(our, "ui", true, false, vec!["/"]).expect("couldn't serve UI");
     http::bind_http_path("/state", true, false).expect("couldn't bind HTTP state path");
@@ -13,7 +15,7 @@ pub fn serve(our: &Address) {
     http::bind_ws_path("/updates", true, false).expect("couldn't bind WS updates path");
 
     // add icon to homepage
-    kinode_process_lib::homepage::add_to_homepage("Contacts", None, Some("/"), None);
+    kinode_process_lib::homepage::add_to_homepage("Contacts", Some(ICON), Some("/"), None);
 }
 
 pub fn send_ws_updates(state: &State, ws_channels: &HashSet<u32>) {

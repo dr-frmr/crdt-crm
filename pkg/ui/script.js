@@ -460,7 +460,8 @@ function enableEditSocials(container, uuid) {
 init();
 
 // Setup WebSocket connection
-const ws = new WebSocket("ws://" + location.host + "/contacts:crdt-crm:mothu.eth/updates");
+const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const ws = new WebSocket(wsProtocol + "//" + location.host + "/contacts:crdt-crm:mothu.eth/updates");
 ws.onmessage = event => {
     const data = JSON.parse(event.data);
     console.log(data);

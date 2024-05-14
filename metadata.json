@@ -1,6 +1,6 @@
 {
     "name": "CRDT Contacts",
-    "description": "A simple contracts management app that uses CRDTs",
+    "description": "A simple shared contacts management app that uses CRDTs to sync between users!",
     "image": "",
     "properties": {
         "package_name": "crdt-crm",
@@ -8,9 +8,9 @@
         "publisher": "mothu.eth",
         "mirrors": [],
         "code_hashes": {
-            "0.1.0": ""
+            "0.2.0": "ead47a575c2017667c6a5ee94ed501d4448ed5833a9a89ef1d16e12562fa76fd"
         }
     },
-    "external_url": "",
+    "external_url": "https://github.com/dr-frmr/crdt-crm",
     "animation_url": ""
 }

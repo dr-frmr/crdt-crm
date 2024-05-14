@@ -8,7 +8,7 @@
         "publisher": "mothu.eth",
         "mirrors": [],
         "code_hashes": {
-            "0.2.0": "ead47a575c2017667c6a5ee94ed501d4448ed5833a9a89ef1d16e12562fa76fd"
+            "0.2.0": "92ce12d13368ffbb3ba24981840d605d90f6608de06414862cbe3b710c7ac1da"
         }
     },
     "external_url": "https://github.com/dr-frmr/crdt-crm",

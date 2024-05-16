@@ -11,7 +11,8 @@
         ],
         "code_hashes": {
             "0.2.0": "968fb8ff6ba7f0612043268e330622f6514c23f5d4c4a5a2121b29e016ce1572"
-        }
+        },
+        "wit_version": 0
     },
     "external_url": "https://github.com/dr-frmr/crdt-crm",
     "animation_url": ""

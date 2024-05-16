@@ -18,8 +18,8 @@ mod response;
 mod state;
 
 wit_bindgen::generate!({
-    path: "wit",
-    world: "process",
+    path: "target/wit",
+    world: "process-v0",
 });
 
 const TIMEOUT: u64 = 30;
